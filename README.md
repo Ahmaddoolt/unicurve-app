@@ -1,7 +1,7 @@
 # 🎓 UniCurve - Student Success Platform
 
 <p align="center">
-  <img src="[LINK TO YOUR MAIN APP BANNER/LOGO OR A KEY SCREENSHOT]" alt="UniCurve App Banner" width="800"/>
+  <img src="https://github.com/user-attachments/assets/70d17b89-e727-4999-a4a5-22dc2c53e0b5" alt="UniCurve App Banner" width="800"/>
 </p>
 
 > A comprehensive student success platform designed to empower university students by helping them navigate their academic journey, optimize course planning, and visualize their progress.
