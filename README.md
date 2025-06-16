@@ -1,7 +1,7 @@
 # 🎓 UniCurve - Student Success Platform
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/70d17b89-e727-4999-a4a5-22dc2c53e0b5" alt="UniCurve App Banner" width="350"/>
+  <img src="https://github.com/user-attachments/assets/70d17b89-e727-4999-a4a5-22dc2c53e0b5" alt="UniCurve App Banner" width="600"/>
 </p>
 
 > A comprehensive student success platform designed to empower university students by helping them navigate their academic journey, optimize course planning, and visualize their progress.
@@ -17,7 +17,7 @@ UniCurve is packed with powerful features designed for both students and adminis
 ### 🧑‍🎓 For Students:
 
 *   **Optimal Timetable Generation:**
-    *   Leverages a **custom priority-based scheduling algorithm** to automatically generate the best possible timetables based on subject prerequisites and real-time dependencies.
+    *   Leverages a **custom priority-based scheduling algorithm** to automatically generate the top three best possible timetables based on subject prerequisites and real-time dependencies.
 *   **Dynamic Subject Dependency Tree:**
     *   An interactive, visual graph that clearly shows which subjects unlock others, helping students plan multiple semesters ahead.
 *   **Comprehensive GPA & Progress Tools:**
@@ -59,8 +59,17 @@ This project was built with a modern, scalable, and maintainable tech stack.
 
 ## 🧠 The Core Algorithm
 
-The heart of UniCurve is its custom scheduling algorithm. Here’s how it works:
+The heart of UniCurve is a custom, heuristic-based scheduling algorithm designed to solve the complex problem of timetable creation. It intelligently finds the best schedules by following these steps:
 
-1.  **Dependency Graph Creation:** The system first builds a directed graph of all subjects, where edges represent prerequisites.
-2.  **Priority Calculation:** Each subject is assigned a "priority weight" based on how many subsequent courses it unlocks. Core subjects like `Programming 2` receive a higher weight.
-3.  **Optimal Path Traversal:** The algorithm traverses the graph, prioritizing high-weight subjects while resolving time conflicts to build the most efficient timetable for the student.
+1.  **Priority Scoring:** It first calculates a "priority weight" for every available subject based on how many future courses it unlocks. This ensures that critical "gateway" subjects are prioritized.
+
+2.  **Ranked List Generation:** All available subjects are sorted into a list from highest to lowest priority.
+
+3.  **Iterative Timetable Construction:** The algorithm iterates through the prioritized list, attempting to add one subject at a time to a new timetable.
+
+4.  **Intelligent Conflict Resolution (The Core Logic):** When adding a new subject (e.g., `Numerical Analysis`) results in a time conflict with an already-placed subject (e.g., `Math 2`):
+    *   **It doesn't fail.** Instead, it first attempts to resolve the conflict by trying all other available sections or categories for `Math 2`.
+    *   If no section of `Math 2` works, the algorithm **backtracks** further. It will then try to change the section of the *previous* subject (`Programming 2`) to free up a new time slot that could accommodate both `Math 2` and `Numerical Analysis`.
+    *   This backtracking and permutation process allows the system to explore multiple combinations to find a valid, conflict-free schedule.
+
+5.  **Presenting Top 3 Options:** The entire process is run to generate the **top three most optimal, conflict-free timetable options**, giving the student the power to choose the best schedule for their needs.
