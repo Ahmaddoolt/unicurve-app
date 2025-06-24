@@ -5,18 +5,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unicurve/domain/models/major.dart';
 import 'package:unicurve/pages/uni_admin/professors/professors_supabase_service.dart';
 
-// Provider for majors, dependent on universityId
 final majorsProvider = FutureProvider.family<List<Major>, int>((
   ref,
   universityId,
 ) async {
-  // Check cache
   final prefs = await SharedPreferences.getInstance();
   final cachedData = prefs.getString('cached_majors_$universityId');
   final cacheTimestamp =
       prefs.getInt('cache_timestamp_majors_$universityId') ?? 0;
   final cacheAge = DateTime.now().millisecondsSinceEpoch - cacheTimestamp;
-  const cacheDuration = 3600000; // 1 hour in milliseconds
+  const cacheDuration = 3600000;
 
   if (cachedData != null && cacheAge < cacheDuration) {
     final decoded = jsonDecode(cachedData) as List<dynamic>;
@@ -26,14 +24,13 @@ final majorsProvider = FutureProvider.family<List<Major>, int>((
             .where((major) => major.id != null)
             .toList();
     if (majors.isNotEmpty) {
-      print(
-        'Loaded ${majors.length} majors from cache for universityId: $universityId',
-      );
+      // print(
+      //   'Loaded ${majors.length} majors from cache for universityId: $universityId',
+      // );
       return majors;
     }
   }
 
-  // Fetch from Supabase
   try {
     final response = await Supabase.instance.client
         .from('majors')
@@ -47,7 +44,6 @@ final majorsProvider = FutureProvider.family<List<Major>, int>((
             .where((major) => major.id != null)
             .toList();
 
-    // Cache the majors
     final validMajors = majors.where((major) => major.id != null).toList();
     final jsonList = validMajors.map((major) => major.toJson()).toList();
     await prefs.setString('cached_majors_$universityId', jsonEncode(jsonList));
@@ -55,9 +51,9 @@ final majorsProvider = FutureProvider.family<List<Major>, int>((
       'cache_timestamp_majors_$universityId',
       DateTime.now().millisecondsSinceEpoch,
     );
-    print(
-      'Fetched ${majors.length} majors from Supabase for universityId: $universityId',
-    );
+    // print(
+    //   'Fetched ${majors.length} majors from Supabase for universityId: $universityId',
+    // );
 
     return majors;
   } catch (e) {
@@ -65,7 +61,6 @@ final majorsProvider = FutureProvider.family<List<Major>, int>((
   }
 });
 
-// Notifier to handle adding and updating majors
 class MajorsNotifier extends StateNotifier<List<Major>> {
   MajorsNotifier() : super([]);
 
@@ -83,13 +78,11 @@ class MajorsNotifier extends StateNotifier<List<Major>> {
         throw Exception('Inserted major is missing id');
       }
 
-      // Update cache and state
       final universityId = major.universityId;
       final cachedMajors = await ref.read(majorsProvider(universityId).future);
       final updatedMajors = [...cachedMajors, newMajor];
       state = updatedMajors;
 
-      // Update cache in SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final jsonList = updatedMajors.map((m) => m.toJson()).toList();
       await prefs.setString(
@@ -117,7 +110,6 @@ class MajorsNotifier extends StateNotifier<List<Major>> {
           .update({'name': name.trim()})
           .eq('id', majorId);
 
-      // Update cache and state
       final cachedMajors = await ref.read(majorsProvider(universityId).future);
       final updatedMajors =
           cachedMajors.map((m) {
@@ -132,7 +124,6 @@ class MajorsNotifier extends StateNotifier<List<Major>> {
           }).toList();
       state = updatedMajors;
 
-      // Update cache in SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final jsonList = updatedMajors.map((m) => m.toJson()).toList();
       await prefs.setString(
@@ -154,7 +145,10 @@ final majorsNotifierProvider =
       return MajorsNotifier();
     });
 
-final majorDetailsProvider = FutureProvider.autoDispose.family<Major, int>((ref, majorId) async {
+final majorDetailsProvider = FutureProvider.autoDispose.family<Major, int>((
+  ref,
+  majorId,
+) async {
   final supabaseService = SupabaseService();
   return supabaseService.fetchSingleMajor(majorId);
 });

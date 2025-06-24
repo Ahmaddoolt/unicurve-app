@@ -4,30 +4,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unicurve/domain/models/professor.dart';
 import 'package:unicurve/pages/uni_admin/professors/professors_supabase_service.dart';
 
-// The single, unified provider for the professors feature
-final professorsProvider = StateNotifierProvider.autoDispose.family<
-  ProfessorsNotifier,
-  AsyncValue<List<Professor>>,
-  int
->((ref, majorId) {
-  final notifier = ProfessorsNotifier(majorId);
-  // Keep the provider alive even when not watched, useful for background tasks or caching
-  // ref.keepAlive();
-  return notifier;
-});
+final professorsProvider = StateNotifierProvider.autoDispose
+    .family<ProfessorsNotifier, AsyncValue<List<Professor>>, int>((
+      ref,
+      majorId,
+    ) {
+      final notifier = ProfessorsNotifier(majorId);
+      ref.keepAlive();
+      return notifier;
+    });
 
 class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
   final int majorId;
   final SupabaseService _supabaseService = SupabaseService();
   final TextEditingController searchController = TextEditingController();
 
-  // We keep a copy of the full list to perform filtering without re-fetching
   List<Professor> _fullProfessorList = [];
 
   ProfessorsNotifier(this.majorId) : super(const AsyncValue.loading()) {
-    // Listen to the search controller to apply filtering
     searchController.addListener(_filterProfessors);
-    // Fetch initial data when the notifier is created
     fetchProfessors();
   }
 
@@ -36,7 +31,6 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
     try {
       final professors = await _supabaseService.fetchProfessors(majorId);
       _fullProfessorList = professors;
-      // After fetching, apply any existing filter text
       _filterProfessors();
     } catch (e, stack) {
       state = AsyncValue.error(e, stack);
@@ -61,7 +55,7 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
     required Map<int, bool> subjectSelection,
     required Map<int, bool> subjectActiveStatus,
   }) async {
-    state = const AsyncValue.loading(); // Show loading state in UI
+    state = const AsyncValue.loading();
     try {
       final newProfessor = Professor(name: name, majorId: majorId);
       final insertedProfessor = await _supabaseService.insertProfessor(
@@ -82,11 +76,9 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
       if (subjectInserts.isNotEmpty) {
         await _supabaseService.insertSubjectProfessors(subjectInserts);
       }
-      // Refetch the list to get the most up-to-date data
       await fetchProfessors();
     } catch (e) {
-      // If an error occurs, you might want to revert to the previous state or show an error
-      await fetchProfessors(); // Refetch to restore a valid state
+      await fetchProfessors();
       rethrow;
     }
   }
@@ -131,20 +123,18 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
   Future<void> deleteProfessor(int? professorId) async {
     if (professorId == null) return;
 
-    // Optimistic update: remove the professor from the list immediately
     final previousList = _fullProfessorList;
     _fullProfessorList =
         _fullProfessorList.where((p) => p.id != professorId).toList();
-    _filterProfessors(); // Update the UI state
+    _filterProfessors();
 
     try {
       await _supabaseService.deleteSubjectProfessors(professorId);
       await _supabaseService.deleteProfessor(professorId);
     } catch (e) {
-      // If the deletion fails, revert to the previous state
       _fullProfessorList = previousList;
       _filterProfessors();
-      rethrow; // Allow the UI to catch the error and show a message
+      rethrow;
     }
   }
 
