@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:unicurve/core/utils/colors.dart';
 
-// Your AppColors class, now living inside the theme file for better organization.
 class AppTheme {
   static final ThemeData lightTheme = ThemeData(
     brightness: Brightness.light,
     scaffoldBackgroundColor: AppColors.lightBackground,
     primaryColor: AppColors.primary,
-    // fontFamily removed to use system default
-    
+
     colorScheme: const ColorScheme.light(
       primary: AppColors.primary,
       onPrimary: Colors.white,
@@ -40,12 +38,14 @@ class AppTheme {
     listTileTheme: const ListTileThemeData(
       iconColor: AppColors.lightTextSecondary,
     ),
-    
+
     textTheme: const TextTheme(
       bodyLarge: TextStyle(color: AppColors.lightTextPrimary),
-      bodyMedium: TextStyle(color: AppColors.lightTextPrimary),
-      // Changed from GoogleFonts to standard TextStyle
-      titleLarge: TextStyle(fontWeight: FontWeight.bold, color: AppColors.lightTextPrimary),
+      bodyMedium: TextStyle(color: Color.fromARGB(255, 88, 88, 88)),
+      titleLarge: TextStyle(
+        fontWeight: FontWeight.bold,
+        color: AppColors.lightTextPrimary,
+      ),
     ),
   );
 
@@ -53,8 +53,7 @@ class AppTheme {
     brightness: Brightness.dark,
     scaffoldBackgroundColor: AppColors.darkBackground,
     primaryColor: AppColors.primary,
-    // fontFamily removed to use system default
-    
+
     colorScheme: const ColorScheme.dark(
       primary: AppColors.primary,
       onPrimary: Colors.white,
@@ -62,7 +61,9 @@ class AppTheme {
       onSecondary: Colors.black,
       error: AppColors.error,
       onError: Colors.white,
+      // ignore: deprecated_member_use
       background: AppColors.darkBackground,
+      // ignore: deprecated_member_use
       onBackground: AppColors.darkTextPrimary,
       surface: AppColors.darkSurface,
       onSurface: AppColors.darkTextPrimary,
@@ -84,7 +85,7 @@ class AppTheme {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
-    
+
     listTileTheme: const ListTileThemeData(
       iconColor: AppColors.darkTextSecondary,
     ),
@@ -92,8 +93,10 @@ class AppTheme {
     textTheme: const TextTheme(
       bodyLarge: TextStyle(color: AppColors.darkTextPrimary),
       bodyMedium: TextStyle(color: AppColors.darkTextSecondary),
-      // Changed from GoogleFonts to standard TextStyle
-      titleLarge: TextStyle(fontWeight: FontWeight.bold, color: AppColors.darkTextPrimary),
+      titleLarge: TextStyle(
+        fontWeight: FontWeight.bold,
+        color: AppColors.darkTextPrimary,
+      ),
     ),
   );
 }
