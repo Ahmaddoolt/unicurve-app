@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:unicurve/core/utils/colors.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String? title;
@@ -25,12 +24,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       title:
           titleWidget ??
           (title != null
-              ? Text(title!, style: TextStyle(color: AppColors.darkTextPrimary))
+              ? Text(
+                title!,
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              )
               : null),
       centerTitle: centerTitle,
       leading: leading,
       actions: actions,
-      backgroundColor: backgroundColor ?? AppColors.darkBackground,
+      backgroundColor:
+          backgroundColor ?? Theme.of(context).scaffoldBackgroundColor,
     );
   }
 

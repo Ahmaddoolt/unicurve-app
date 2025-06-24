@@ -13,6 +13,7 @@ class CustomTextField extends StatelessWidget {
   final Function(String)? onChanged;
   final int? maxLines;
   final Widget? suffixIcon;
+  final TextDirection? textDirection;
 
   const CustomTextField({
     super.key,
@@ -27,6 +28,7 @@ class CustomTextField extends StatelessWidget {
     this.onChanged,
     this.maxLines = 1,
     this.suffixIcon,
+    this.textDirection,
   });
 
   @override
@@ -42,16 +44,26 @@ class CustomTextField extends StatelessWidget {
       onChanged: onChanged,
       maxLines: maxLines,
       cursorColor: AppColors.primary,
+      textDirection: textDirection,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: AppColors.darkTextPrimary),
-        suffixIcon: suffixIcon,
+        labelStyle: Theme.of(context).textTheme.labelLarge,
+        suffixIcon:
+            suffixIcon != null
+                ? IconTheme(
+                  data: IconThemeData(
+                    // ignore: deprecated_member_use
+                    color: Theme.of(context).iconTheme.color?.withOpacity(0.6),
+                  ),
+                  child: suffixIcon!,
+                )
+                : null,
         focusedBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: Color.fromARGB(255, 0, 255, 174), width: 2),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
           borderRadius: BorderRadius.circular(8),
         ),
         enabledBorder: OutlineInputBorder(
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.2),
+          borderSide: BorderSide(color: Colors.grey.shade700, width: 1.2),
           borderRadius: BorderRadius.circular(8),
         ),
         errorBorder: OutlineInputBorder(
@@ -62,12 +74,13 @@ class CustomTextField extends StatelessWidget {
           borderSide: const BorderSide(color: Colors.red, width: 2),
           borderRadius: BorderRadius.circular(8),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         errorMaxLines: 2,
       ),
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: AppColors.darkTextPrimary,
-          ),
+      style: Theme.of(context).textTheme.bodyMedium,
     );
   }
 }

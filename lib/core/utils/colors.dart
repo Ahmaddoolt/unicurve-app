@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Common
-  // static const Color primary = Color(0xFF3FCF8E); // Subabase-like green
-  static const Color primary = Color(0xFF24C28F); // Subabase-like green
+  // static const Color primary = Color(0xFF3FCF8E);
+  static const Color primary = Color(0xFF24C28F);
   static const Color primaryDark = Color.fromARGB(255, 46, 163, 110);
-  static const Color accent = Color(0xFFFFC107); // Amber/gold
+  static const Color accent = Color(0xFFFFC107);
   static const Color error = Color(0xFFD32F2F);
 
   // Light Theme
-  static const Color lightBackground = Color.fromARGB(255, 186, 186, 186);
+  static const Color lightBackground = Color.fromARGB(255, 231, 231, 231);
   static const Color lightSurface = Color(0xFFF5F5F5);
   static const Color lightTextPrimary = Color(0xFF212121);
   static const Color lightTextSecondary = Color(0xFF757575);

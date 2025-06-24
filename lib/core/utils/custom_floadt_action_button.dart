@@ -5,11 +5,7 @@ class CustomFAB extends StatelessWidget {
   final VoidCallback onPressed;
   final IconData icon;
 
-  const CustomFAB({
-    super.key,
-    required this.onPressed,
-    this.icon = Icons.add,
-  });
+  const CustomFAB({super.key, required this.onPressed, this.icon = Icons.add});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +15,7 @@ class CustomFAB extends StatelessWidget {
         border: Border.all(color: AppColors.primary, width: 3),
       ),
       child: FloatingActionButton(
-        backgroundColor: AppColors.darkBackground,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         onPressed: onPressed,
         child: Icon(icon, color: AppColors.primary),
       ),

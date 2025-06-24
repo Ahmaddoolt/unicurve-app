@@ -1,6 +1,6 @@
 class Validators {
   static String? validateEmail(String? value) {
-    print('Validating email: "$value"');
+    // print('Validating email: "$value"');
     if (value == null || value.trim().isEmpty) {
       return 'Email is required';
     }
@@ -12,7 +12,7 @@ class Validators {
   }
 
   static String? validatePassword(String? value) {
-    print('Validating password: "$value"');
+    // print('Validating password: "$value"');
     if (value == null || value.trim().isEmpty) {
       return 'Password is required';
     }
@@ -23,7 +23,7 @@ class Validators {
   }
 
   static String? validateName(String? value) {
-    print('Validating name: "$value"');
+    // print('Validating name: "$value"');
     if (value == null || value.trim().isEmpty) {
       return 'Name is required';
     }
@@ -32,7 +32,6 @@ class Validators {
     }
     return null;
   }
-
 
   static String? validateUniversityNumber(String? value) {
     if (value == null || value.isEmpty) {
@@ -45,7 +44,7 @@ class Validators {
   }
 
   static String? validateRequired(String? value) {
-    print('Validating required field: "$value"');
+    // print('Validating required field: "$value"');
     if (value == null || value.trim().isEmpty) {
       return 'This field is required';
     }
@@ -53,16 +52,14 @@ class Validators {
   }
 
   static String? validatePhoneNumber(String? value) {
-    print('Validating phone number: "$value"');
+    // print('Validating phone number: "$value"');
     if (value == null || value.trim().isEmpty) {
       return 'Phone number is required';
     }
-    // Simplified regex: 8-15 digits, optional + prefix
     final phoneRegex = RegExp(r'^\+?\d{8,15}$');
     if (!phoneRegex.hasMatch(value.trim())) {
       return 'Enter a valid phone number (8-15 digits, optional +)';
     }
     return null;
   }
-  
 }
