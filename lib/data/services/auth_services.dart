@@ -16,7 +16,10 @@ class AuthService {
     return null;
   }
 
-  Future<void> saveCredentials({required bool isRememberMe, required String uid}) async {
+  Future<void> saveCredentials({
+    required bool isRememberMe,
+    required String uid,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isRememberMe', isRememberMe);
     await prefs.setString('uid', uid);
@@ -28,7 +31,10 @@ class AuthService {
     await prefs.remove('uid');
   }
 
-  Future<User?> signIn({required String email, required String password}) async {
+  Future<User?> signIn({
+    required String email,
+    required String password,
+  }) async {
     try {
       final response = await _supabase.auth.signInWithPassword(
         email: email,
@@ -42,7 +48,6 @@ class AuthService {
 
   Future<String?> signUp({required Student student}) async {
     try {
-      // Sign up with Supabase auth
       final authResponse = await _supabase.auth.signUp(
         email: student.email,
         password: student.password!,
@@ -53,7 +58,6 @@ class AuthService {
         throw Exception('Failed to create user');
       }
 
-      // Insert student data into the students table
       await _supabase.from('students').insert({
         'user_id': userId,
         'first_name': student.firstName,
@@ -75,7 +79,6 @@ class AuthService {
 
   Future<String?> submitAdminRequest({required UniAdmin uniAdmin}) async {
     try {
-      // Sign up with Supabase auth
       final authResponse = await _supabase.auth.signUp(
         email: uniAdmin.email,
         password: uniAdmin.password!,
@@ -86,13 +89,8 @@ class AuthService {
         throw AuthException('Failed to create user');
       }
 
-      // Prepare data for insertion, including user_id
-      final data = {
-        ...uniAdmin.toJson(),
-        'user_id': userId, // Explicitly include user_id
-      };
+      final data = {...uniAdmin.toJson(), 'user_id': userId};
 
-      // Insert admin request data into the add_uni_pending_requests table
       await _supabase.from('add_uni_pending_requests').insert(data);
 
       return userId;
@@ -113,9 +111,12 @@ class AuthService {
     }
   }
 
-  Future<List<dynamic>> getUniversities() async {
+  Future<List<dynamic>> getUniversities(String location) async {
     try {
-      return await _supabase.from('universities').select();
+      return await _supabase
+          .from('universities')
+          .select()
+          .eq('uni_location', location);
     } on PostgrestException catch (e) {
       throw Exception('Database error: ${e.message}');
     }
@@ -123,7 +124,10 @@ class AuthService {
 
   Future<List<dynamic>> getMajors(int universityId) async {
     try {
-      return await _supabase.from('majors').select().eq('university_id', universityId);
+      return await _supabase
+          .from('majors')
+          .select()
+          .eq('university_id', universityId);
     } on PostgrestException catch (e) {
       throw Exception('Database error: ${e.message}');
     }
@@ -131,14 +135,15 @@ class AuthService {
 
   Future<Map<String, dynamic>?> getUserRole(String userId) async {
     try {
-      final response = await _supabase
-          .from('uni_admin')
-          .select('id, university_id, position')
-          .eq('user_id', userId)
-          .single();
+      final response =
+          await _supabase
+              .from('uni_admin')
+              .select('id, university_id, position')
+              .eq('user_id', userId)
+              .single();
       return response;
     } catch (e) {
-      return null; // User is not an admin
+      return null;
     }
   }
 
