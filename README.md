@@ -56,7 +56,7 @@ For any university, curriculum planning is a high-stakes puzzle. Students strugg
   <tr>
     <td align="center"><strong>Onboarding</strong><br><img src="assets/onboarding_screen.png" width="250"></td>
     <td align="center"><strong>Login</strong><br><img src="assets/login_screen.png" width="250"></td>
-    <td align="center"><strong>Student Sign Up</strong><br><img src="assets/student_signup_screen.png" width="250"></td>
+    <td align="center"><strong>Student Sign Up</strong><br><img src="assets/student_screens/student_signup_screen.png" width="250"></td>
   </tr>
 </table>
 </details>
