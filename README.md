@@ -1,7 +1,7 @@
 # 🎓 UniCurve - A Scalable, Multi-University Success Platform
 
 <p align="center">
-  <!-- IMPORTANT: Replace this with the path to your logo in the 'assets' folder -->
+  <!-- IMPORTANT: This path points to your logo inside the 'assets' folder -->
   <img src="assets/1024.png" alt="UniCurve App Logo" width="300"/>
 </p>
 
@@ -66,23 +66,23 @@ For any university, curriculum planning is a high-stakes puzzle. Students strugg
 <br>
 <table>
   <tr>
-    <td align="center"><strong>Subjects List</strong><br><img src="assets/subjects_list.png" width="250"></td>
-    <td align="center"><strong>Subject Detail</strong><br><img src="assets/detail_subject.png" width="250"></td>
-    <td align="center"><strong>Curriculum Tree</strong><br><img src="assets/subjects_tree.png" width="250"></td>
+    <td align="center"><strong>Subjects List</strong><br><img src="assets/student_screens/subjects_list.png" width="250"></td>
+    <td align="center"><strong>Subject Detail</strong><br><img src="assets/student_screens/detail_subject.png" width="250"></td>
+    <td align="center"><strong>Curriculum Tree</strong><br><img src="assets/student_screens/subjects_tree.png" width="250"></td>
   </tr>
   <tr>
-    <td align="center"><strong>Best Subjects to Take</strong><br><img src="assets/best_subjects_to_take.png" width="250"></td>
-    <td align="center"><strong>Best Tables to Take</strong><br><img src="assets/best_table_to_take.png" width="250"></td>
-    <td align="center"><strong>Term GPA Calculator</strong><br><img src="assets/term_gpa_calculate.png" width="250"></td>
+    <td align="center"><strong>Best Subjects to Take</strong><br><img src="assets/student_screens/best_subjects_to_take.png" width="250"></td>
+    <td align="center"><strong>Best Tables to Take</strong><br><img src="assets/student_screens/best_table_to_take.png" width="250"></td>
+    <td align="center"><strong>Term GPA Calculator</strong><br><img src="assets/student_screens/term_gpa_calculate.png" width="250"></td>
   </tr>
     <tr>
-    <td align="center"><strong>Goal GPA Plan</strong><br><img src="assets/goal_gpa_plan.png" width="250"></td>
-    <td align="center"><strong>GPA Improvement Scenarios</strong><br><img src="assets/gpa_improve_plan_senarios.png" width="250"></td>
-    <td align="center"><strong>Student Profile</strong><br><img src="assets/student_profile.png" width="250"></td>
+    <td align="center"><strong>Goal GPA Plan</strong><br><img src="assets/student_screens/goal_gpa_plan.png" width="250"></td>
+    <td align="center"><strong>GPA Improvement Scenarios</strong><br><img src="assets/student_screens/gpa_improve_plan_senarios.png" width="250"></td>
+    <td align="center"><strong>Student Profile</strong><br><img src="assets/student_screens/student_profile.png" width="250"></td>
   </tr>
   <tr>
-    <td align="center"><strong>Major Requirements Progress</strong><br><img src="assets/major_req_progress.png" width="250"></td>
-    <td align="center"><strong>Settings</strong><br><img src="assets/student_setting.png" width="250"></td>
+    <td align="center"><strong>Major Requirements Progress</strong><br><img src="assets/student_screens/major_req_progress.png" width="250"></td>
+    <td align="center"><strong>Settings</strong><br><img src="assets/student_screens/student_setting.png" width="250"></td>
     <td></td>
   </tr>
 </table>
@@ -93,22 +93,22 @@ For any university, curriculum planning is a high-stakes puzzle. Students strugg
 <br>
 <table>
   <tr>
-    <td align="center"><strong>Admin Dashboard</strong><br><img src="assets/uniadmin_dashboard.png" width="250"></td>
-    <td align="center"><strong>Manage Majors</strong><br><img src="assets/manage_majors.png" width="250"></td>
-    <td align="center"><strong>Manage Major Requirements</strong><br><img src="assets/mange_major_requermints.png" width="250"></td>
+    <td align="center"><strong>Admin Dashboard</strong><br><img src="assets/uni_admin_screens/uniadmin_dashboard.png" width="250"></td>
+    <td align="center"><strong>Manage Majors</strong><br><img src="assets/uni_admin_screens/manage_majors.png" width="250"></td>
+    <td align="center"><strong>Manage Major Requirements</strong><br><img src="assets/uni_admin_screens/mange_major_requermints.png" width="250"></td>
   </tr>
   <tr>
-    <td align="center"><strong>Manage Subjects</strong><br><img src="assets/mange_subjects.png" width="250"></td>
-    <td align="center"><strong>Detail Subjects</strong><br><img src="assets/detail_subjects.png" width="250"></td>
-    <td align="center"><strong>Manage Subject Relationships</strong><br><img src="assets/manage_subjects_relationships.png" width="250"></td>
+    <td align="center"><strong>Manage Subjects</strong><br><img src="assets/uni_admin_screens/mange_subjects.png" width="250"></td>
+    <td align="center"><strong>Detail Subjects</strong><br><img src="assets/uni_admin_screens/detail_subjects.png" width="250"></td>
+    <td align="center"><strong>Manage Subject Relationships</strong><br><img src="assets/uni_admin_screens/manage_subjects_relationships.png" width="250"></td>
   </tr>
     <tr>
-    <td align="center"><strong>Manage Professors</strong><br><img src="assets/manage_professors.png" width="250"></td>
-    <td align="center"><strong>Add Professor</strong><br><img src="assets/add_professor.png" width="250"></td>
-    <td align="center"><strong>Manage Subject Timings</strong><br><img src="assets/manage_subjects_timing_opening.png" width="250"></td>
+    <td align="center"><strong>Manage Professors</strong><br><img src="assets/uni_admin_screens/manage_professors.png" width="250"></td>
+    <td align="center"><strong>Add Professor</strong><br><img src="assets/uni_admin_screens/add_professor.png" width="250"></td>
+    <td align="center"><strong>Manage Subject Timings</strong><br><img src="assets/uni_admin_screens/manage_subjects_timing_opening.png" width="250"></td>
   </tr>
   <tr>
-    <td align="center"><strong>Admin Settings</strong><br><img src="assets/uni_admin_setting.png" width="250"></td>
+    <td align="center"><strong>Admin Settings</strong><br><img src="assets/uni_admin_screens/uni_admin_setting.png" width="250"></td>
     <td></td>
     <td></td>
   </tr>
