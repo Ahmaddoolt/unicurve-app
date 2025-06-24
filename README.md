@@ -56,7 +56,7 @@ For any university, curriculum planning is a high-stakes puzzle. Students strugg
   <tr>
     <td align="center"><strong>Onboarding</strong><br><img src="assets/onboarding_screen.png" width="250"></td>
     <td align="center"><strong>Login</strong><br><img src="assets/login_screen.png" width="250"></td>
-    <td align="center"><strong>Student Sign Up</strong><br><img src="assets/student_screens/student_signup_screen.png" width="250"></td>
+    <td align="center"><strong>Student Sign Up</strong><br><img src="assets/student_signup_screen.png" width="250"></td>
   </tr>
 </table>
 </details>
@@ -129,9 +129,9 @@ Here's how it works:
     *   All currently open subjects and their available sections/groups (`subjects`, `subject_groups`).
     *   The student's major requirements and remaining credit hours.
 
-2.  **Dynamic Priority Scoring:** It calculates a "priority score" for every available subject. This score is a combination of:
+2.  **Dynamic Priority Scoring:** It calculates a "priority score" for every available subject. This score is a combination of two factors:
     *   **Static Priority:** A predefined importance set by the university admin (e.g., a critical capstone project).
-    *   **Dynamic "Unlock" Score:** A calculated weight based on how many future courses this subject unlocks. This ensures critical "gateway" subjects are prioritized.
+    *   **Dynamic "Unlock" Score:** This is the core of the strategic prioritization. The algorithm analyzes the `subject_relationships` table to determine how many future courses are unlocked by completing a specific subject. For example, if "Programming 2" is a prerequisite for 5 advanced courses, it receives a dynamic priority of +5. This ensures that critical "gateway" courses, which open up the most future options, are naturally pushed to the top of the recommendation list.
 
 3.  **Recursive Backtracking Search:** The algorithm begins a recursive search to build valid schedules.
     *   It starts with an empty schedule and iterates through the prioritized list of subjects.
