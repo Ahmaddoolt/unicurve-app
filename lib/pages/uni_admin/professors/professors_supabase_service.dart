@@ -6,23 +6,20 @@ import 'package:unicurve/domain/models/subject.dart';
 class SupabaseService {
   final SupabaseClient _client = Supabase.instance.client;
 
-  // New method to fetch a single major
   Future<Major> fetchSingleMajor(int majorId) async {
-    final response = await _client
-        .from('majors')
-        .select('id, name, university_id')
-        .eq('id', majorId)
-        .single();
+    final response =
+        await _client
+            .from('majors')
+            .select('id, name, university_id')
+            .eq('id', majorId)
+            .single();
     return Major.fromJson(response);
   }
 
   Future<String?> fetchMajorName(int? majorId) async {
     if (majorId == null) return null;
-    final response = await _client
-        .from('majors')
-        .select('name')
-        .eq('id', majorId)
-        .single();
+    final response =
+        await _client.from('majors').select('name').eq('id', majorId).single();
     return response['name'] as String?;
   }
 
@@ -32,7 +29,7 @@ class SupabaseService {
         .from('professors')
         .select('id, name, major_id')
         .eq('major_id', majorId)
-        .order('name', ascending: true); // <-- FIX: Sorts professors alphabetically
+        .order('name', ascending: true);
     return (response as List<dynamic>)
         .map((json) => Professor.fromJson(json))
         .toList();
@@ -42,7 +39,9 @@ class SupabaseService {
     if (majorId == null) return [];
     final response = await _client
         .from('subjects')
-        .select('id, code, name, description, hours, is_open, major_id, level, priority, type')
+        .select(
+          'id, code, name, description, hours, is_open, major_id, level, priority, type',
+        )
         .eq('major_id', majorId);
     return (response as List<dynamic>)
         .map((json) => Subject.fromMap(json))
@@ -60,7 +59,7 @@ class SupabaseService {
         item['subject_id'] as int: item['isActive'] as bool,
     };
   }
-  
+
   Future<List<Subject>> fetchSubjectsForProfessor(int? professorId) async {
     if (professorId == null) return [];
     final response = await _client
@@ -69,7 +68,7 @@ class SupabaseService {
           'subjects!inner(id, code, name, description, hours, is_open, major_id, level, priority, type)',
         )
         .eq('professor_id', professorId);
-    
+
     return (response as List<dynamic>)
         .map((t) => Subject.fromMap(t['subjects']))
         .toList();
@@ -91,16 +90,18 @@ class SupabaseService {
   }
 
   Future<Professor> insertProfessor(Professor professor) async {
-    final response = await _client
-        .from('professors')
-        .insert(professor.toJson())
-        .select('id, name, major_id')
-        .single();
+    final response =
+        await _client
+            .from('professors')
+            .insert(professor.toJson())
+            .select('id, name, major_id')
+            .single();
     return Professor.fromJson(response);
   }
 
   Future<void> insertSubjectProfessors(
-      List<Map<String, dynamic>> subjectInserts) async {
+    List<Map<String, dynamic>> subjectInserts,
+  ) async {
     if (subjectInserts.isNotEmpty) {
       await _client.from('subject_professors').insert(subjectInserts);
     }
@@ -116,7 +117,10 @@ class SupabaseService {
 
   Future<void> deleteSubjectProfessors(int? professorId) async {
     if (professorId == null) return;
-    await _client.from('subject_professors').delete().eq('professor_id', professorId);
+    await _client
+        .from('subject_professors')
+        .delete()
+        .eq('professor_id', professorId);
   }
 
   Future<void> deleteProfessor(int? professorId) async {
