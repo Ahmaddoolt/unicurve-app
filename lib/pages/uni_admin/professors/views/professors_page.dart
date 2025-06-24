@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
 import 'package:unicurve/core/utils/custom_floadt_action_button.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
@@ -14,15 +15,17 @@ class ProfessorsPage extends ConsumerWidget {
 
   const ProfessorsPage({super.key, required this.majorId});
 
-  // REPLACE THE ENTIRE BUILD METHOD IN ProfessorsPage
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scaleConfig = ScaleConfig(context);
     final professorsState = ref.watch(professorsProvider(majorId));
     final professorsNotifier = ref.read(professorsProvider(majorId).notifier);
-    // FIX: Use the new, correct provider to get details for THIS majorId
     final majorDetailsAsync = ref.watch(majorDetailsProvider(majorId));
+
+    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
+    Color? lighterColor = Theme.of(context).cardColor;
+    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     return Scaffold(
       floatingActionButton: CustomFAB(
@@ -34,24 +37,23 @@ class ProfessorsPage extends ConsumerWidget {
                       AddEditProfessorDialog(majorId: majorId, isEdit: false),
             ),
       ),
-      backgroundColor: AppColors.darkSurface,
+      backgroundColor: lighterColor,
       appBar: AppBar(
         centerTitle: true,
-        backgroundColor: AppColors.darkBackground,
-        // FIX: Use the new provider for the title
+        backgroundColor: darkerColor,
         title: majorDetailsAsync.when(
           data:
               (major) => Text(
-                'Professors for ${major.name}',
+                'prof_page_title'.trParams({'majorName': major.name}),
                 style: TextStyle(
-                  color: AppColors.darkTextPrimary,
+                  color: primaryTextColor,
                   fontWeight: FontWeight.bold,
                   fontSize: scaleConfig.scaleText(18),
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
-          loading: () => const Text('Loading Major...'),
-          error: (_, __) => const Text('Manage Professors'),
+          loading: () => Text('loading_text'.tr),
+          error: (_, __) => Text('prof_page_title_fallback'.tr),
         ),
       ),
       body: Column(
@@ -61,9 +63,9 @@ class ProfessorsPage extends ConsumerWidget {
             child: TextField(
               controller: professorsNotifier.searchController,
               decoration: InputDecoration(
-                hintText: 'Search professors by name...',
+                hintText: 'prof_page_search_hint'.tr,
                 hintStyle: TextStyle(
-                  color: AppColors.darkTextSecondary,
+                  color: secondaryTextColor,
                   fontSize: scaleConfig.scaleText(14),
                 ),
                 prefixIcon: Icon(
@@ -72,7 +74,7 @@ class ProfessorsPage extends ConsumerWidget {
                   size: scaleConfig.scale(20),
                 ),
                 filled: true,
-                fillColor: AppColors.darkBackground,
+                fillColor: darkerColor,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
                   borderSide: BorderSide.none,
@@ -83,7 +85,7 @@ class ProfessorsPage extends ConsumerWidget {
                 ),
               ),
               style: TextStyle(
-                color: AppColors.darkTextPrimary,
+                color: primaryTextColor,
                 fontSize: scaleConfig.scaleText(14),
               ),
             ),
@@ -95,10 +97,10 @@ class ProfessorsPage extends ConsumerWidget {
                   return Center(
                     child: Text(
                       professorsNotifier.searchController.text.isEmpty
-                          ? 'No professors found. Add one!'
-                          : 'No matching professors found.',
+                          ? 'prof_page_no_professors_found'.tr
+                          : 'prof_page_no_matching_professors'.tr,
                       style: TextStyle(
-                        color: AppColors.darkTextSecondary,
+                        color: secondaryTextColor,
                         fontSize: scaleConfig.scaleText(16),
                       ),
                     ),
@@ -115,7 +117,7 @@ class ProfessorsPage extends ConsumerWidget {
                     itemBuilder: (context, index) {
                       final professor = professors[index];
                       return Card(
-                        color: AppColors.darkBackground,
+                        color: darkerColor,
                         elevation: 2,
                         margin: EdgeInsets.symmetric(
                           horizontal: scaleConfig.scale(16),
@@ -134,7 +136,7 @@ class ProfessorsPage extends ConsumerWidget {
                           contentPadding: EdgeInsets.all(scaleConfig.scale(16)),
                           leading: CircleAvatar(
                             radius: scaleConfig.scale(20),
-                            backgroundColor: AppColors.darkSurface,
+                            backgroundColor: lighterColor,
                             child: Icon(
                               Icons.person,
                               color: AppColors.accent,
@@ -142,27 +144,33 @@ class ProfessorsPage extends ConsumerWidget {
                             ),
                           ),
                           title: Text(
-                            professor.name ?? 'Unknown',
+                            professor.name ?? 'prof_details_unknown_prof'.tr,
                             style: TextStyle(
-                              color: AppColors.darkTextPrimary,
+                              color: primaryTextColor,
                               fontWeight: FontWeight.bold,
                               fontSize: scaleConfig.scaleText(16),
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
-                          // FIX: Use the new provider for the subtitle
                           subtitle: majorDetailsAsync.when(
                             data:
                                 (major) => Text(
-                                  'Major: ${major.name}',
+                                  'prof_details_major_label_with_name'.trParams(
+                                    {'majorName': major.name},
+                                  ),
                                   style: TextStyle(
-                                    color: AppColors.darkTextSecondary,
+                                    color: secondaryTextColor,
                                     fontSize: scaleConfig.scaleText(14),
                                   ),
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                            loading: () => const Text('Loading Major...'),
-                            error: (_, __) => const Text('Major: N/A'),
+                            loading: () => Text('loading_text'.tr),
+                            error:
+                                (_, __) => Text(
+                                  'prof_details_major_label_with_name'.trParams(
+                                    {'majorName': 'not_available'.tr},
+                                  ),
+                                ),
                           ),
                           onTap:
                               () => showDialog(
@@ -174,7 +182,7 @@ class ProfessorsPage extends ConsumerWidget {
                                     ),
                               ),
                           trailing: PopupMenuButton<String>(
-                            color: AppColors.darkSurface,
+                            color: lighterColor,
                             icon: Icon(
                               Icons.more_vert,
                               color: AppColors.accent,
@@ -211,9 +219,9 @@ class ProfessorsPage extends ConsumerWidget {
                                         ),
                                         const SizedBox(width: 3),
                                         Text(
-                                          'Edit',
+                                          'popup_edit'.tr,
                                           style: TextStyle(
-                                            color: AppColors.darkTextPrimary,
+                                            color: primaryTextColor,
                                             fontSize: scaleConfig.scaleText(14),
                                           ),
                                         ),
@@ -230,7 +238,7 @@ class ProfessorsPage extends ConsumerWidget {
                                         ),
                                         const SizedBox(width: 3),
                                         Text(
-                                          'Delete',
+                                          'popup_delete'.tr,
                                           style: TextStyle(
                                             color: AppColors.error,
                                             fontSize: scaleConfig.scaleText(14),
@@ -257,9 +265,11 @@ class ProfessorsPage extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Error loading professors: $error',
+                          'prof_page_error_loading'.trParams({
+                            'error': error.toString(),
+                          }),
                           style: TextStyle(
-                            color: AppColors.darkTextSecondary,
+                            color: secondaryTextColor,
                             fontSize: scaleConfig.scaleText(16),
                           ),
                           textAlign: TextAlign.center,
@@ -273,7 +283,7 @@ class ProfessorsPage extends ConsumerWidget {
                                       )
                                       .fetchProfessors(),
                           child: Text(
-                            'Retry',
+                            'retry_button'.tr,
                             style: TextStyle(
                               color: AppColors.accent,
                               fontSize: scaleConfig.scaleText(14),
@@ -295,56 +305,55 @@ class ProfessorsPage extends ConsumerWidget {
     WidgetRef ref,
     Professor professor,
   ) {
+    Color? lighterColor = Theme.of(context).cardColor;
+    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+
     showDialog(
       context: context,
       builder:
           (alertDialogContext) => AlertDialog(
-            backgroundColor: AppColors.darkSurface,
-            title: const Text(
-              'Delete Professor',
-              style: TextStyle(color: AppColors.darkTextPrimary),
+            backgroundColor: lighterColor,
+            title: Text(
+              'prof_delete_dialog_title'.tr,
+              style: TextStyle(color: primaryTextColor),
             ),
-            content: const Text(
-              'Are you sure you want to delete this professor? This action cannot be undone.',
-              style: TextStyle(color: AppColors.darkTextPrimary),
+            content: Text(
+              'prof_delete_confirmation'.tr,
+              style: TextStyle(color: primaryTextColor),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(alertDialogContext).pop(),
-                child: const Text(
-                  'Cancel',
-                  style: TextStyle(color: AppColors.accent),
+                child: Text(
+                  'cancel'.tr,
+                  style: const TextStyle(color: AppColors.accent),
                 ),
               ),
               TextButton(
                 onPressed: () async {
-                  Navigator.of(alertDialogContext).pop(); // Close dialog
+                  Navigator.of(alertDialogContext).pop();
                   try {
                     await ref
                         .read(professorsProvider(majorId).notifier)
                         .deleteProfessor(professor.id);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Professor deleted.'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    }
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Error deleting professor: $e'),
+                          content: Text(
+                            'prof_error_delete'.trParams({
+                              'error': e.toString(),
+                            }),
+                          ),
                           backgroundColor: AppColors.error,
                         ),
                       );
                     }
                   }
                 },
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(color: AppColors.error),
+                child: Text(
+                  'delete_button'.tr,
+                  style: const TextStyle(color: AppColors.error),
                 ),
               ),
             ],

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:unicurve/core/utils/colors.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 
 class DetailRow extends StatelessWidget {
@@ -18,6 +17,9 @@ class DetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+
     return Padding(
       padding: EdgeInsets.symmetric(vertical: scaleConfig.scale(6)),
       child: Column(
@@ -26,7 +28,7 @@ class DetailRow extends StatelessWidget {
           Text(
             '$label:',
             style: TextStyle(
-              color: AppColors.darkTextSecondary,
+              color: secondaryTextColor,
               fontSize: scaleConfig.scaleText(14),
               fontWeight: FontWeight.w600,
             ),
@@ -35,7 +37,7 @@ class DetailRow extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-              color: AppColors.darkTextPrimary,
+              color: primaryTextColor,
               fontSize: scaleConfig.scaleText(14),
             ),
             overflow: isMultiLine ? null : TextOverflow.ellipsis,

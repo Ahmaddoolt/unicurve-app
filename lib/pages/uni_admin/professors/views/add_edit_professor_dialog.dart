@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/domain/models/professor.dart';
@@ -20,16 +21,17 @@ class AddEditProfessorDialog extends ConsumerStatefulWidget {
   });
 
   @override
-  _AddEditProfessorDialogState createState() => _AddEditProfessorDialogState();
+  AddEditProfessorDialogState createState() => AddEditProfessorDialogState();
 }
 
-class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog> {
+class AddEditProfessorDialogState
+    extends ConsumerState<AddEditProfessorDialog> {
   late final TextEditingController _nameController;
   late final TextEditingController _searchController;
   List<Subject> _availableSubjects = [];
   List<Subject> _filteredSubjects = [];
-  Map<int, bool> _subjectSelection = {};
-  Map<int, bool> _subjectActiveStatus = {};
+  final Map<int, bool> _subjectSelection = {};
+  final Map<int, bool> _subjectActiveStatus = {};
   bool _isLoading = false;
   bool _isSaving = false;
   String? _errorMessage;
@@ -53,9 +55,11 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
   void _filterSubjects() {
     final query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredSubjects = _availableSubjects.where((subject) {
-        return (subject.name.toLowerCase()).contains(query) || (subject.code.toLowerCase()).contains(query);
-      }).toList();
+      _filteredSubjects =
+          _availableSubjects.where((subject) {
+            return (subject.name.toLowerCase()).contains(query) ||
+                (subject.code.toLowerCase()).contains(query);
+          }).toList();
     });
   }
 
@@ -70,7 +74,9 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
         _subjectActiveStatus[subject.id ?? 0] = false;
       }
       if (widget.isEdit && widget.professor != null) {
-        final assignments = await supabaseService.fetchTeachingAssignments(widget.professor!.id);
+        final assignments = await supabaseService.fetchTeachingAssignments(
+          widget.professor!.id,
+        );
         for (var entry in assignments.entries) {
           if (_subjectSelection.containsKey(entry.key)) {
             _subjectSelection[entry.key] = true;
@@ -82,18 +88,20 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Error fetching subjects: $e';
+        _errorMessage = 'prof_dialog_error_fetch_subjects'.trParams({
+          'error': e.toString(),
+        });
       });
     }
   }
 
   Future<void> _saveProfessor() async {
     if (_nameController.text.isEmpty) {
-      setState(() => _errorMessage = 'Please fill in the professor name');
+      setState(() => _errorMessage = 'prof_dialog_error_name_empty'.tr);
       return;
     }
     if (widget.isEdit && widget.professor == null) {
-      setState(() => _errorMessage = 'Error: Professor ID is missing');
+      setState(() => _errorMessage = 'prof_dialog_error_missing_id'.tr);
       return;
     }
 
@@ -121,7 +129,11 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Professor ${widget.isEdit ? 'updated' : 'added'} successfully.'),
+            content: Text(
+              widget.isEdit
+                  ? 'prof_dialog_success_update'.tr
+                  : 'prof_dialog_success_add'.tr,
+            ),
             backgroundColor: AppColors.primary,
           ),
         );
@@ -129,7 +141,12 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = 'Error saving professor: $e');
+        setState(
+          () =>
+              _errorMessage = 'prof_dialog_error_save'.trParams({
+                'error': e.toString(),
+              }),
+        );
       }
     } finally {
       if (mounted) {
@@ -138,34 +155,38 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
     }
   }
 
-  // FIX: The entire build method is refactored to use a Column instead of a Stack.
   @override
   Widget build(BuildContext context) {
     final scaleConfig = ScaleConfig(context);
+    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
+    Color? lighterColor = Theme.of(context).cardColor;
+    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
         side: const BorderSide(color: AppColors.primaryDark, width: 2),
       ),
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: darkerColor,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: scaleConfig.scale(320),
-          maxHeight: scaleConfig.scale(550), // Increased height slightly for more room
+          maxHeight: scaleConfig.scale(550),
         ),
-        // FIX: Replaced Stack with a simple Padding and Column structure.
         child: Padding(
           padding: EdgeInsets.all(scaleConfig.scale(16)),
           child: Column(
-            mainAxisSize: MainAxisSize.min, // Let the column size itself.
-            crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch children horizontally.
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                widget.isEdit ? 'Edit Professor' : 'Add Professor',
+                widget.isEdit
+                    ? 'prof_dialog_edit_title'.tr
+                    : 'prof_dialog_add_title'.tr,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppColors.darkTextPrimary,
+                  color: primaryTextColor,
                   fontWeight: FontWeight.bold,
                   fontSize: scaleConfig.scaleText(18),
                 ),
@@ -174,30 +195,33 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
               TextField(
                 controller: _nameController,
                 decoration: InputDecoration(
-                  labelText: 'Professor Name',
-                  labelStyle: TextStyle(color: AppColors.darkTextSecondary),
+                  labelText: 'prof_dialog_name_label'.tr,
+                  labelStyle: TextStyle(color: secondaryTextColor),
                   filled: true,
-                  fillColor: AppColors.darkSurface,
+                  fillColor: lighterColor,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                    borderSide: BorderSide(color: AppColors.darkTextSecondary),
+                    borderSide: BorderSide(color: secondaryTextColor!),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                    borderSide: BorderSide(color: AppColors.darkTextSecondary),
+                    borderSide: BorderSide(color: secondaryTextColor),
                   ),
-                  errorText: _nameController.text.isEmpty ? 'Name is required' : null,
+                  errorText:
+                      _nameController.text.isEmpty
+                          ? 'prof_dialog_error_name_empty'.tr
+                          : null,
                 ),
-                style: TextStyle(color: AppColors.darkTextPrimary),
+                style: TextStyle(color: primaryTextColor),
                 onChanged: (_) => setState(() {}),
               ),
               SizedBox(height: scaleConfig.scale(16)),
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search subjects by name or code...',
+                  hintText: 'prof_dialog_search_hint'.tr,
                   hintStyle: TextStyle(
-                    color: AppColors.darkTextSecondary,
+                    color: secondaryTextColor,
                     fontSize: scaleConfig.scaleText(14),
                   ),
                   prefixIcon: Icon(
@@ -206,7 +230,7 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
                     size: scaleConfig.scale(20),
                   ),
                   filled: true,
-                  fillColor: AppColors.darkBackground,
+                  fillColor: darkerColor,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
                     borderSide: BorderSide.none,
@@ -217,99 +241,136 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
                   ),
                 ),
                 style: TextStyle(
-                  color: AppColors.darkTextPrimary,
+                  color: primaryTextColor,
                   fontSize: scaleConfig.scaleText(14),
                 ),
               ),
               SizedBox(height: scaleConfig.scale(16)),
               Text(
-                'Select Subjects:',
+                'prof_dialog_select_subjects_title'.tr,
                 style: TextStyle(
-                  color: AppColors.darkTextPrimary,
+                  color: primaryTextColor,
                   fontWeight: FontWeight.bold,
                   fontSize: scaleConfig.scaleText(16),
                 ),
               ),
               SizedBox(height: scaleConfig.scale(4)),
-              // FIX: The scrollable list is now in an Expanded widget, so it takes
-              // up the available space and can scroll freely.
               Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                    : _filteredSubjects.isEmpty
+                child:
+                    _isLoading
+                        ? const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                        )
+                        : _filteredSubjects.isEmpty
                         ? Padding(
-                            padding: EdgeInsets.symmetric(vertical: scaleConfig.scale(8)),
-                            child: Text(
-                              'No subjects available for this major',
-                              style: TextStyle(
-                                color: AppColors.darkTextSecondary,
-                                fontSize: scaleConfig.scaleText(14),
-                              ),
-                            ),
-                          )
-                        : SingleChildScrollView(
-                            child: Column(
-                              children: _filteredSubjects.map((subject) {
-                                final isChecked = _subjectSelection[subject.id ?? 0]!;
-                                return Column(
-                                  children: [
-                                    CheckboxListTile(
-                                      title: Text(
-                                        '${subject.name} (${subject.code}, Hours: ${subject.hours})${subject.isOpen ? '' : ' - Not Open'}',
-                                        style: TextStyle(
-                                          color: subject.isOpen ? AppColors.primary : Colors.orange,
-                                          fontSize: scaleConfig.scaleText(14),
-                                        ),
-                                      ),
-                                      value: isChecked,
-                                      onChanged: _isSaving
-                                          ? null
-                                          : (bool? value) {
-                                              setState(() {
-                                                _subjectSelection[subject.id ?? 0] = value!;
-                                                if (!value) {
-                                                  _subjectActiveStatus[subject.id ?? 0] = false;
-                                                }
-                                              });
-                                            },
-                                      activeColor: AppColors.accent,
-                                      contentPadding: EdgeInsets.symmetric(
-                                        horizontal: scaleConfig.scale(8),
-                                        vertical: scaleConfig.scale(2),
-                                      ),
-                                    ),
-                                    if (isChecked && subject.isOpen)
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                          left: scaleConfig.scale(48),
-                                          right: scaleConfig.scale(8),
-                                        ),
-                                        child: CheckboxListTile(
-                                          title: Text(
-                                            'Actively Teaching',
-                                            style: TextStyle(
-                                              color: AppColors.darkTextPrimary,
-                                              fontSize: scaleConfig.scaleText(12),
-                                            ),
-                                          ),
-                                          value: _subjectActiveStatus[subject.id ?? 0],
-                                          onChanged: _isSaving
-                                              ? null
-                                              : (bool? value) {
-                                                  setState(() {
-                                                    _subjectActiveStatus[subject.id ?? 0] = value!;
-                                                  });
-                                                },
-                                          activeColor: AppColors.accent,
-                                          dense: true,
-                                          contentPadding: EdgeInsets.zero,
-                                        ),
-                                      ),
-                                  ],
-                                );
-                              }).toList(),
+                          padding: EdgeInsets.symmetric(
+                            vertical: scaleConfig.scale(8),
+                          ),
+                          child: Text(
+                            'prof_dialog_no_subjects'.tr,
+                            style: TextStyle(
+                              color: secondaryTextColor,
+                              fontSize: scaleConfig.scaleText(14),
                             ),
                           ),
+                        )
+                        : SingleChildScrollView(
+                          child: Column(
+                            children:
+                                _filteredSubjects.map((subject) {
+                                  final isChecked =
+                                      _subjectSelection[subject.id ?? 0]!;
+                                  return Column(
+                                    children: [
+                                      CheckboxListTile(
+                                        title: Text(
+                                          'prof_dialog_subject_display'
+                                                  .trParams({
+                                                    'name': subject.name,
+                                                    'code': subject.code,
+                                                    'hours':
+                                                        subject.hours
+                                                            .toString(),
+                                                  }) +
+                                              (subject.isOpen
+                                                  ? ''
+                                                  : ' - ${'prof_dialog_subject_not_open'.tr}'),
+                                          style: TextStyle(
+                                            color:
+                                                subject.isOpen
+                                                    ? AppColors.primary
+                                                    : Colors.orange,
+                                            fontSize: scaleConfig.scaleText(14),
+                                          ),
+                                        ),
+                                        value: isChecked,
+                                        onChanged:
+                                            _isSaving
+                                                ? null
+                                                : (bool? value) {
+                                                  setState(() {
+                                                    _subjectSelection[subject
+                                                                .id ??
+                                                            0] =
+                                                        value!;
+                                                    if (!value) {
+                                                      _subjectActiveStatus[subject
+                                                                  .id ??
+                                                              0] =
+                                                          false;
+                                                    }
+                                                  });
+                                                },
+                                        activeColor: AppColors.accent,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: scaleConfig.scale(8),
+                                          vertical: scaleConfig.scale(2),
+                                        ),
+                                      ),
+                                      if (isChecked && subject.isOpen)
+                                        Padding(
+                                          padding: EdgeInsets.only(
+                                            left: scaleConfig.scale(48),
+                                            right: scaleConfig.scale(8),
+                                          ),
+                                          child: CheckboxListTile(
+                                            title: Text(
+                                              'prof_dialog_actively_teaching'
+                                                  .tr,
+                                              style: TextStyle(
+                                                color: primaryTextColor,
+                                                fontSize: scaleConfig.scaleText(
+                                                  12,
+                                                ),
+                                              ),
+                                            ),
+                                            value:
+                                                _subjectActiveStatus[subject
+                                                        .id ??
+                                                    0],
+                                            onChanged:
+                                                _isSaving
+                                                    ? null
+                                                    : (bool? value) {
+                                                      setState(() {
+                                                        _subjectActiveStatus[subject
+                                                                    .id ??
+                                                                0] =
+                                                            value!;
+                                                      });
+                                                    },
+                                            activeColor: AppColors.accent,
+                                            dense: true,
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                }).toList(),
+                          ),
+                        ),
               ),
               if (_errorMessage != null) ...[
                 SizedBox(height: scaleConfig.scale(12)),
@@ -323,7 +384,7 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
                     children: [
                       Icon(
                         Icons.error,
-                        color: AppColors.darkTextSecondary,
+                        color: secondaryTextColor,
                         size: scaleConfig.scale(20),
                       ),
                       SizedBox(width: scaleConfig.scale(8)),
@@ -331,7 +392,7 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
                         child: Text(
                           _errorMessage!,
                           style: TextStyle(
-                            color: AppColors.darkTextSecondary,
+                            color: secondaryTextColor,
                             fontSize: scaleConfig.scaleText(14),
                           ),
                         ),
@@ -341,15 +402,16 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
                 ),
               ],
               SizedBox(height: scaleConfig.scale(8)),
-              // FIX: The action buttons are now the last item in the Column,
-              // ensuring they are always visible and below the content.
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
-                    onPressed: _isSaving || _isLoading ? null : () => Navigator.pop(context),
+                    onPressed:
+                        _isSaving || _isLoading
+                            ? null
+                            : () => Navigator.pop(context),
                     child: Text(
-                      'Cancel',
+                      'cancel'.tr,
                       style: TextStyle(
                         color: AppColors.accent,
                         fontSize: scaleConfig.scaleText(14),
@@ -358,22 +420,25 @@ class _AddEditProfessorDialogState extends ConsumerState<AddEditProfessorDialog>
                   ),
                   TextButton(
                     onPressed: _isSaving || _isLoading ? null : _saveProfessor,
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              color: AppColors.accent,
-                              strokeWidth: 2,
+                    child:
+                        _isSaving
+                            ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: AppColors.accent,
+                                strokeWidth: 2,
+                              ),
+                            )
+                            : Text(
+                              widget.isEdit
+                                  ? 'save_button'.tr
+                                  : 'add_button'.tr,
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: scaleConfig.scaleText(14),
+                              ),
                             ),
-                          )
-                        : Text(
-                            widget.isEdit ? 'Save' : 'Add',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: scaleConfig.scaleText(14),
-                            ),
-                          ),
                   ),
                 ],
               ),
