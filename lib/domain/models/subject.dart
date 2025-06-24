@@ -1,6 +1,3 @@
-// lib/domain/models/subject.dart
-
-// Subject class remains the same...
 class Subject {
   final int? id;
   final String code;
@@ -26,7 +23,6 @@ class Subject {
     this.type,
   });
 
-  // fromMap and toMap remain the same...
   Map<String, dynamic> toMap() {
     return {
       'code': code,
@@ -57,7 +53,6 @@ class Subject {
   }
 }
 
-
 class SubjectGroup {
   final int id;
   final String groupCode;
@@ -72,10 +67,10 @@ class SubjectGroup {
   });
 
   factory SubjectGroup.fromMap(Map<String, dynamic> map) {
-    // FIX IS HERE: Changed 'schedules' to 'subject_schedules'
-    final schedulesList = (map['subject_schedules'] as List? ?? [])
-        .map((scheduleMap) => Schedule.fromMap(scheduleMap))
-        .toList();
+    final schedulesList =
+        (map['subject_schedules'] as List? ?? [])
+            .map((scheduleMap) => Schedule.fromMap(scheduleMap))
+            .toList();
 
     return SubjectGroup(
       id: map['id'],
@@ -86,7 +81,6 @@ class SubjectGroup {
   }
 }
 
-// Schedule class remains the same...
 class Schedule {
   final int id;
   final int groupId;
