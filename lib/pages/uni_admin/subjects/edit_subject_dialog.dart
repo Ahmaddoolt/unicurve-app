@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unicurve/core/utils/colors.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
@@ -9,10 +10,10 @@ class EditSubjectDialog extends StatefulWidget {
   const EditSubjectDialog({super.key, required this.subject});
 
   @override
-  _EditSubjectDialogState createState() => _EditSubjectDialogState();
+  EditSubjectDialogState createState() => EditSubjectDialogState();
 }
 
-class _EditSubjectDialogState extends State<EditSubjectDialog> {
+class EditSubjectDialogState extends State<EditSubjectDialog> {
   final _formKey = GlobalKey<FormState>();
   final supabase = Supabase.instance.client;
   late String _code;
@@ -41,6 +42,8 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
   }
 
   Future<void> _fetchMajors() async {
+    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+
     try {
       final response = await supabase.from('majors').select('id, name');
       if (mounted) {
@@ -53,9 +56,11 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Error fetching majors: $e',
+              'add_subject_error_fetch_majors'.trParams({
+                'error': e.toString(),
+              }),
               style: TextStyle(
-                color: AppColors.darkTextPrimary,
+                color: primaryTextColor,
                 fontSize: context.scaleConfig.scaleText(14),
               ),
             ),
@@ -67,6 +72,8 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
   }
 
   Future<void> _saveChanges() async {
+    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       setState(() => _isLoading = true);
@@ -97,9 +104,9 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Error updating subject: $e',
+                'edit_subject_error_update'.trParams({'error': e.toString()}),
                 style: TextStyle(
-                  color: AppColors.darkTextPrimary,
+                  color: primaryTextColor,
                   fontSize: context.scaleConfig.scaleText(14),
                 ),
               ),
@@ -114,22 +121,25 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
   @override
   Widget build(BuildContext context) {
     final scaleConfig = context.scaleConfig;
+    Color? lighterColor = Theme.of(context).cardColor;
+    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     return AlertDialog(
-      backgroundColor: AppColors.darkSurface,
+      backgroundColor: lighterColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
       ),
       title: Text(
-        'Edit Subject',
+        'edit_subject_dialog_title'.tr,
         style: TextStyle(
-          color: AppColors.darkTextPrimary,
+          color: primaryTextColor,
           fontWeight: FontWeight.bold,
           fontSize: scaleConfig.scaleText(18),
         ),
       ),
       content: SingleChildScrollView(
-        child: Container(
+        child: SizedBox(
           width: scaleConfig.widthPercentage(0.8),
           child: Form(
             key: _formKey,
@@ -139,9 +149,9 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                 TextFormField(
                   initialValue: _code,
                   decoration: InputDecoration(
-                    labelText: 'Subject Code*',
+                    labelText: 'add_subject_code_label'.tr,
                     labelStyle: TextStyle(
-                      color: AppColors.darkTextSecondary,
+                      color: secondaryTextColor,
                       fontSize: scaleConfig.scaleText(14),
                     ),
                     border: OutlineInputBorder(
@@ -149,23 +159,30 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                      borderSide: BorderSide(
+                        // ignore: deprecated_member_use
+                        color: AppColors.primary.withOpacity(0.5),
+                      ),
                     ),
                   ),
                   style: TextStyle(
-                    color: AppColors.darkTextPrimary,
+                    color: primaryTextColor,
                     fontSize: scaleConfig.scaleText(14),
                   ),
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                  validator:
+                      (value) =>
+                          value?.isEmpty ?? true
+                              ? 'error_field_required'.tr
+                              : null,
                   onSaved: (value) => _code = value!,
                 ),
                 SizedBox(height: scaleConfig.scale(12)),
                 TextFormField(
                   initialValue: _name,
                   decoration: InputDecoration(
-                    labelText: 'Subject Name*',
+                    labelText: 'add_subject_name_label'.tr,
                     labelStyle: TextStyle(
-                      color: AppColors.darkTextSecondary,
+                      color: secondaryTextColor,
                       fontSize: scaleConfig.scaleText(14),
                     ),
                     border: OutlineInputBorder(
@@ -173,23 +190,30 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                      borderSide: BorderSide(
+                        // ignore: deprecated_member_use
+                        color: AppColors.primary.withOpacity(0.5),
+                      ),
                     ),
                   ),
                   style: TextStyle(
-                    color: AppColors.darkTextPrimary,
+                    color: primaryTextColor,
                     fontSize: scaleConfig.scaleText(14),
                   ),
-                  validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+                  validator:
+                      (value) =>
+                          value?.isEmpty ?? true
+                              ? 'error_field_required'.tr
+                              : null,
                   onSaved: (value) => _name = value!,
                 ),
                 SizedBox(height: scaleConfig.scale(12)),
                 TextFormField(
                   initialValue: _description,
                   decoration: InputDecoration(
-                    labelText: 'Description',
+                    labelText: 'add_subject_desc_label'.tr,
                     labelStyle: TextStyle(
-                      color: AppColors.darkTextSecondary,
+                      color: secondaryTextColor,
                       fontSize: scaleConfig.scaleText(14),
                     ),
                     border: OutlineInputBorder(
@@ -197,11 +221,14 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                      borderSide: BorderSide(
+                        // ignore: deprecated_member_use
+                        color: AppColors.primary.withOpacity(0.5),
+                      ),
                     ),
                   ),
                   style: TextStyle(
-                    color: AppColors.darkTextPrimary,
+                    color: primaryTextColor,
                     fontSize: scaleConfig.scaleText(14),
                   ),
                   maxLines: 3,
@@ -211,9 +238,9 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                 TextFormField(
                   initialValue: _hours.toString(),
                   decoration: InputDecoration(
-                    labelText: 'Hours*',
+                    labelText: 'add_subject_hours_label'.tr,
                     labelStyle: TextStyle(
-                      color: AppColors.darkTextSecondary,
+                      color: secondaryTextColor,
                       fontSize: scaleConfig.scaleText(14),
                     ),
                     border: OutlineInputBorder(
@@ -221,27 +248,34 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                      borderSide: BorderSide(
+                        // ignore: deprecated_member_use
+                        color: AppColors.primary.withOpacity(0.5),
+                      ),
                     ),
                   ),
                   style: TextStyle(
-                    color: AppColors.darkTextPrimary,
+                    color: primaryTextColor,
                     fontSize: scaleConfig.scaleText(14),
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if (value?.isEmpty ?? true) return 'Required';
+                    if (value?.isEmpty ?? true) {
+                      return 'error_field_required'.tr;
+                    }
                     final hours = int.tryParse(value!);
-                    return hours == null || hours <= 0 ? 'Enter valid hours' : null;
+                    return hours == null || hours <= 0
+                        ? 'edit_subject_error_valid_hours'.tr
+                        : null;
                   },
                   onSaved: (value) => _hours = int.parse(value!),
                 ),
                 SizedBox(height: scaleConfig.scale(12)),
                 SwitchListTile(
                   title: Text(
-                    'Is Open',
+                    'add_subject_is_open_label'.tr,
                     style: TextStyle(
-                      color: AppColors.darkTextPrimary,
+                      color: primaryTextColor,
                       fontSize: scaleConfig.scaleText(14),
                     ),
                   ),
@@ -251,9 +285,9 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                 ),
                 DropdownButtonFormField<int>(
                   decoration: InputDecoration(
-                    labelText: 'Major',
+                    labelText: 'add_subject_major_label'.tr,
                     labelStyle: TextStyle(
-                      color: AppColors.darkTextSecondary,
+                      color: secondaryTextColor,
                       fontSize: scaleConfig.scaleText(14),
                     ),
                     border: OutlineInputBorder(
@@ -261,33 +295,37 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                      borderSide: BorderSide(
+                        // ignore: deprecated_member_use
+                        color: AppColors.primary.withOpacity(0.5),
+                      ),
                     ),
                   ),
-                  dropdownColor: AppColors.darkSurface,
+                  dropdownColor: lighterColor,
                   value: _majorId,
-                  items: _majors.map((major) {
-                    return DropdownMenuItem<int>(
-                      value: int.parse(major['id'].toString()),
-                      child: Text(
-                        major['name'],
-                        style: TextStyle(
-                          color: AppColors.darkTextPrimary,
-                          fontSize: scaleConfig.scaleText(14),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
+                  items:
+                      _majors.map((major) {
+                        return DropdownMenuItem<int>(
+                          value: int.parse(major['id'].toString()),
+                          child: Text(
+                            major['name'],
+                            style: TextStyle(
+                              color: primaryTextColor,
+                              fontSize: scaleConfig.scaleText(14),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
                   onChanged: (value) => setState(() => _majorId = value),
                   onSaved: (value) => _majorId = value,
                 ),
                 SizedBox(height: scaleConfig.scale(12)),
                 DropdownButtonFormField<int>(
                   decoration: InputDecoration(
-                    labelText: 'Level*',
+                    labelText: 'add_subject_level_label'.tr,
                     labelStyle: TextStyle(
-                      color: AppColors.darkTextSecondary,
+                      color: secondaryTextColor,
                       fontSize: scaleConfig.scaleText(14),
                     ),
                     border: OutlineInputBorder(
@@ -295,24 +333,32 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                      borderSide: BorderSide(
+                        // ignore: deprecated_member_use
+                        color: AppColors.primary.withOpacity(0.5),
+                      ),
                     ),
                   ),
-                  dropdownColor: AppColors.darkSurface,
+                  dropdownColor: lighterColor,
                   value: _level,
-                  items: List.generate(8, (index) => index + 1).map((level) {
-                    return DropdownMenuItem<int>(
-                      value: level,
-                      child: Text(
-                        'Level $level',
-                        style: TextStyle(
-                          color: AppColors.darkTextPrimary,
-                          fontSize: scaleConfig.scaleText(14),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  validator: (value) => value == null ? 'Required' : null,
+                  items:
+                      List.generate(8, (index) => index + 1).map((level) {
+                        return DropdownMenuItem<int>(
+                          value: level,
+                          child: Text(
+                            'add_subject_level_unit'.trParams({
+                              'level': '$level',
+                            }),
+                            style: TextStyle(
+                              color: primaryTextColor,
+                              fontSize: scaleConfig.scaleText(14),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                  validator:
+                      (value) =>
+                          value == null ? 'error_field_required'.tr : null,
                   onChanged: (value) => setState(() => _level = value!),
                   onSaved: (value) => _level = value!,
                 ),
@@ -320,9 +366,9 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                 TextFormField(
                   initialValue: _type,
                   decoration: InputDecoration(
-                    labelText: 'Type',
+                    labelText: 'add_subject_req_type_label'.tr,
                     labelStyle: TextStyle(
-                      color: AppColors.darkTextSecondary,
+                      color: secondaryTextColor,
                       fontSize: scaleConfig.scaleText(14),
                     ),
                     border: OutlineInputBorder(
@@ -330,11 +376,14 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                      borderSide: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                      borderSide: BorderSide(
+                        // ignore: deprecated_member_use
+                        color: AppColors.primary.withOpacity(0.5),
+                      ),
                     ),
                   ),
                   style: TextStyle(
-                    color: AppColors.darkTextPrimary,
+                    color: primaryTextColor,
                     fontSize: scaleConfig.scaleText(14),
                   ),
                   onSaved: (value) => _type = value,
@@ -348,7 +397,7 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.pop(context),
           child: Text(
-            'Cancel',
+            'cancel'.tr,
             style: TextStyle(
               color: AppColors.accent,
               fontSize: scaleConfig.scaleText(14),
@@ -359,13 +408,13 @@ class _EditSubjectDialogState extends State<EditSubjectDialog> {
           onPressed: _isLoading ? null : _saveChanges,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.darkTextPrimary,
+            foregroundColor: primaryTextColor,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
             ),
           ),
           child: Text(
-            'Save',
+            'save_button'.tr,
             style: TextStyle(fontSize: scaleConfig.scaleText(14)),
           ),
         ),
