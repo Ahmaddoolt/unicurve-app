@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_snackbar.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/pages/uni_admin/professors/views/professors_page.dart';
 import 'package:unicurve/pages/uni_admin/providers/admin_university_provider.dart';
 import 'package:unicurve/pages/uni_admin/providers/majors_provider.dart';
-// Import the new provider
 import 'package:unicurve/pages/uni_admin/providers/selected_major_provider.dart';
 import 'package:unicurve/pages/uni_admin/subjects/manage_subjects_with_search.dart';
-// Import the new page we will create
 import 'package:unicurve/pages/uni_admin/subjects_terms_tables/manage_subjects_times_page.dart';
 
 class SelectMajorPage extends ConsumerWidget {
@@ -18,16 +18,20 @@ class SelectMajorPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scaleConfig = ScaleConfig(context);
+    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
+    Color? lighterColor = Theme.of(context).cardColor;
+    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     return Scaffold(
-      backgroundColor: AppColors.darkSurface,
+      backgroundColor: lighterColor,
       appBar: AppBar(
-        backgroundColor: AppColors.darkBackground,
+        backgroundColor: darkerColor,
         centerTitle: true,
         title: Text(
-          'Select Major',
+          'select_major_page_title'.tr,
           style: TextStyle(
-            color: AppColors.darkTextPrimary,
+            color: primaryTextColor,
             fontWeight: FontWeight.bold,
             fontSize: scaleConfig.scaleText(20),
             letterSpacing: 0.5,
@@ -45,10 +49,10 @@ class SelectMajorPage extends ConsumerWidget {
                   child: Padding(
                     padding: EdgeInsets.all(scaleConfig.scale(16)),
                     child: Text(
-                      'No university assigned',
+                      'error_no_university_assigned'.tr,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: AppColors.darkTextSecondary,
+                        color: secondaryTextColor,
                         fontSize: scaleConfig.scaleText(16),
                       ),
                     ),
@@ -76,15 +80,15 @@ class SelectMajorPage extends ConsumerWidget {
                                       children: [
                                         Icon(
                                           Icons.info,
-                                          color: AppColors.darkTextSecondary,
+                                          color: secondaryTextColor,
                                           size: scaleConfig.scale(40),
                                         ),
                                         SizedBox(height: scaleConfig.scale(16)),
                                         Text(
-                                          'No majors found',
+                                          'error_no_majors_found'.tr,
                                           textAlign: TextAlign.center,
                                           style: TextStyle(
-                                            color: AppColors.darkTextSecondary,
+                                            color: secondaryTextColor,
                                             fontSize: scaleConfig.scaleText(16),
                                           ),
                                         ),
@@ -114,7 +118,7 @@ class SelectMajorPage extends ConsumerWidget {
                                         ),
                                         child: Card(
                                           elevation: 2,
-                                          color: AppColors.darkBackground,
+                                          color: darkerColor,
                                           shape: RoundedRectangleBorder(
                                             borderRadius: BorderRadius.circular(
                                               scaleConfig.scale(8),
@@ -136,8 +140,7 @@ class SelectMajorPage extends ConsumerWidget {
                                                 ),
                                             leading: CircleAvatar(
                                               radius: scaleConfig.scale(20),
-                                              backgroundColor:
-                                                  AppColors.darkSurface,
+                                              backgroundColor: lighterColor,
                                               child: Icon(
                                                 Icons.school,
                                                 color: AppColors.primary,
@@ -147,8 +150,7 @@ class SelectMajorPage extends ConsumerWidget {
                                             title: Text(
                                               major.name,
                                               style: TextStyle(
-                                                color:
-                                                    AppColors.darkTextPrimary,
+                                                color: primaryTextColor,
                                                 fontWeight: FontWeight.w600,
                                                 fontSize: scaleConfig.scaleText(
                                                   16,
@@ -164,30 +166,14 @@ class SelectMajorPage extends ConsumerWidget {
                                             ),
                                             onTap: () {
                                               if (major.id == null) {
-                                                ScaffoldMessenger.of(
+                                                showFeedbackSnackbar(
                                                   context,
-                                                ).showSnackBar(
-                                                  SnackBar(
-                                                    content: const Text(
-                                                      'Invalid major ID',
-                                                    ),
-                                                    backgroundColor: Colors.red,
-                                                    behavior:
-                                                        SnackBarBehavior
-                                                            .floating,
-                                                    shape: RoundedRectangleBorder(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
-                                                          ),
-                                                    ),
-                                                  ),
+                                                  'select_major_error_invalid_id'
+                                                      .tr,
+                                                  isError: true,
                                                 );
                                                 return;
                                               }
-
-                                              // ** KEY CHANGE HERE **
-                                              // 1. Update the provider with the selected major's ID
                                               ref
                                                   .read(
                                                     selectedMajorIdProvider
@@ -195,15 +181,16 @@ class SelectMajorPage extends ConsumerWidget {
                                                   )
                                                   .state = major.id;
 
-                                              // 2. Navigate to the correct page
                                               if (wPage == 0) {
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(
-                                                    // Navigate to the page without passing any arguments
                                                     builder:
                                                         (context) =>
-                                                             SearchSubjectsPage(majorId: major.id!,),
+                                                            SearchSubjectsPage(
+                                                              majorId:
+                                                                  major.id!,
+                                                            ),
                                                   ),
                                                 );
                                               } else if (wPage == 1) {
@@ -224,7 +211,7 @@ class SelectMajorPage extends ConsumerWidget {
                                                   MaterialPageRoute(
                                                     builder:
                                                         (context) =>
-                                                            ManageSubjectsPage()
+                                                            const ManageSubjectsPage(),
                                                   ),
                                                 );
                                               }
@@ -255,10 +242,10 @@ class SelectMajorPage extends ConsumerWidget {
                                 ),
                                 SizedBox(height: scaleConfig.scale(16)),
                                 Text(
-                                  'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+                                  'error_wifi'.tr,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    color: AppColors.darkTextSecondary,
+                                    color: secondaryTextColor,
                                     fontSize: scaleConfig.scaleText(16),
                                   ),
                                 ),
@@ -288,10 +275,10 @@ class SelectMajorPage extends ConsumerWidget {
                         ),
                         SizedBox(height: scaleConfig.scale(16)),
                         Text(
-                          'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+                          'error_wifi'.tr,
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: AppColors.darkTextSecondary,
+                            color: secondaryTextColor,
                             fontSize: scaleConfig.scaleText(16),
                           ),
                         ),
