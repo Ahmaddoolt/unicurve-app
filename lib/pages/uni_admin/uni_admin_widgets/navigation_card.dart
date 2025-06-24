@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 
@@ -16,7 +17,10 @@ Widget buildNavigationCard(
   final cardHeight =
       scaleConfig.isTablet ? scaleConfig.scale(150) : scaleConfig.scale(162);
 
-  // Fixed: Provide a default color if theme color is null
+  Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
+  Color? lighterColor = Theme.of(context).cardColor;
+  Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+  Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
 
   return Card(
     elevation: 5,
@@ -35,13 +39,15 @@ Widget buildNavigationCard(
           border: Border.all(color: AppColors.primaryDark, width: 4),
           gradient: LinearGradient(
             colors: [
-              Colors.black,
-              AppColors.darkSurface,
-              AppColors.darkBackground,
-              AppColors.darkSurface,
-              AppColors.darkBackground,
-              AppColors.darkSurface,
-              Colors.black
+              // ignore: deprecated_member_use
+              darkerColor.withOpacity(0.9),
+              lighterColor,
+              darkerColor,
+              lighterColor,
+              darkerColor,
+              lighterColor,
+              // ignore: deprecated_member_use
+              darkerColor.withOpacity(0.9),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -61,17 +67,17 @@ Widget buildNavigationCard(
                     style: TextStyle(
                       fontSize: scaleConfig.scaleText(14),
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: primaryTextColor,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   SizedBox(height: scaleConfig.scale(8)),
                   Text(
-                    'Tap to manage',
+                    'tap_to_manage_subtitle'.tr,
                     style: TextStyle(
                       fontSize: scaleConfig.scaleText(12),
-                      color: Colors.white70,
+                      color: secondaryTextColor,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
