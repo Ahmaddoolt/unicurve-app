@@ -15,7 +15,7 @@ class UniAdminBottomNavIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Icon(
       isSelected ? icon : _getOutlinedIcon(icon),
-      size: 30,
+      size: 31,
       color: isSelected ? AppColors.primary : AppColors.lightTextSecondary,
     );
   }
