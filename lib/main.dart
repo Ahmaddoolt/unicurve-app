@@ -4,16 +4,16 @@ import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unicurve/core/localization/translations.dart';
 import 'package:unicurve/core/theme/app_theme.dart';
-import 'package:unicurve/pages/initialization_screen.dart'; // Import the new screen
+import 'package:unicurve/pages/initialization_screen.dart'; 
 import 'package:unicurve/settings/settings_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    url: 'https://llsiaszwjqejufchefds.supabase.co',
+    url: 'Ypur Supabase URL',
     anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxsc2lhc3p3anFlanVmY2hlZmRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg4NjQwOTcsImV4cCI6MjA2NDQ0MDA5N30.RYxhKWgu7tvohsRVqmh_rt1UFEJTojsG2O2WlRQJ6S4',
+        'Your Key',
   );
 
   runApp(const ProviderScope(child: MyApp()));
