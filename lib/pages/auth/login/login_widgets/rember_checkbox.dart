@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
-
 
 class RememberMeCheckbox extends StatelessWidget {
   final bool value;
@@ -19,14 +19,16 @@ class RememberMeCheckbox extends StatelessWidget {
         Checkbox(
           value: value,
           onChanged: onChanged,
-          activeColor: const Color.fromARGB(255, 0, 255, 174),        // Color of the checkmark
-          checkColor: Colors.black,              // Color of the check itself
-          side: const BorderSide(color: AppColors.primary), // Unchecked border
+          activeColor: const Color.fromARGB(255, 0, 255, 174),
+          checkColor: Colors.black,
+          side: const BorderSide(color: AppColors.primary),
         ),
         const SizedBox(width: 2),
-        const Text(
-          "Remember Me",
-          style: TextStyle(color: AppColors.darkTextPrimary), // Label color
+        Text(
+          'remember_me_label'.tr,
+          style: TextStyle(
+            color: Theme.of(context).textTheme.bodyMedium?.color,
+          ),
         ),
       ],
     );
