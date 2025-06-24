@@ -2,7 +2,7 @@
 
 <p align="center">
   <!-- IMPORTANT: Replace this with the path to your logo in the 'assets' folder -->
-  <img src="assets/logo.png" alt="UniCurve App Logo" width="300"/>
+  <img src="assets/1024.png" alt="UniCurve App Logo" width="300"/>
 </p>
 
 <p align="center">
