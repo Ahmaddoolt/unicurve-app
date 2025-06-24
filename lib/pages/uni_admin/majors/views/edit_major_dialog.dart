@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/domain/models/major.dart';
@@ -31,6 +32,12 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
     _nameController.text = widget.major.name;
   }
 
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
   Future<void> _updateMajor() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -41,10 +48,12 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
 
     try {
       if (widget.major.id == null) {
-        throw Exception('Cannot edit major: Missing ID or University ID');
+        throw Exception('edit_major_error_missing_id'.tr);
       }
 
-      await ref.read(majorsNotifierProvider.notifier).updateMajor(
+      await ref
+          .read(majorsNotifierProvider.notifier)
+          .updateMajor(
             widget.major.id!,
             _nameController.text.trim(),
             widget.major.universityId,
@@ -55,7 +64,7 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Major updated successfully'),
+            content: Text('edit_major_success'.tr),
             backgroundColor: AppColors.primaryDark,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -66,7 +75,12 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = 'Error: ${e.toString().replaceFirst('Exception: ', '')}');
+        setState(
+          () =>
+              _errorMessage = 'error_generic'.trParams({
+                'error': e.toString().replaceFirst('Exception: ', ''),
+              }),
+        );
       }
     } finally {
       if (mounted) {
@@ -76,25 +90,23 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
   }
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final scaleConfig = ScaleConfig(context);
+    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
+    Color? lighterColor = Theme.of(context).cardColor;
+    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     return AlertDialog(
-      backgroundColor: AppColors.darkBackground,
+      backgroundColor: darkerColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
         side: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
       title: Text(
-        'Edit Major',
+        'edit_major_title'.tr,
         style: TextStyle(
-          color: AppColors.darkTextPrimary,
+          color: primaryTextColor,
           fontSize: scaleConfig.scaleText(18),
           fontWeight: FontWeight.bold,
         ),
@@ -109,21 +121,19 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
               TextFormField(
                 controller: _nameController,
                 style: TextStyle(
-                  color: AppColors.darkTextPrimary,
+                  color: primaryTextColor,
                   fontSize: scaleConfig.scaleText(14),
                 ),
                 decoration: InputDecoration(
-                  labelText: 'Major Name',
+                  labelText: 'add_major_name_label'.tr,
                   labelStyle: TextStyle(
-                    color: AppColors.darkTextSecondary,
+                    color: secondaryTextColor,
                     fontSize: scaleConfig.scaleText(14),
                   ),
-                  hintText: 'Enter major name',
-                  hintStyle: TextStyle(
-                    color: AppColors.darkTextSecondary,
-                  ),
+                  hintText: 'add_major_name_hint'.tr,
+                  hintStyle: TextStyle(color: secondaryTextColor),
                   filled: true,
-                  fillColor: AppColors.darkSurface,
+                  fillColor: lighterColor,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
                     borderSide: const BorderSide(color: AppColors.primary),
@@ -137,8 +147,11 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
                     vertical: scaleConfig.scale(12),
                   ),
                 ),
-                validator: (value) =>
-                    value?.trim().isEmpty ?? true ? 'Please enter a major' : null,
+                validator:
+                    (value) =>
+                        value?.trim().isEmpty ?? true
+                            ? 'add_major_error_name_empty'.tr
+                            : null,
                 enabled: !_isLoading,
               ),
               if (_errorMessage != null) ...[
@@ -153,7 +166,7 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
                     children: [
                       Icon(
                         Icons.error,
-                        color: AppColors.darkTextPrimary,
+                        color: primaryTextColor,
                         size: scaleConfig.scale(20),
                       ),
                       SizedBox(width: scaleConfig.scale(8)),
@@ -161,7 +174,7 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
                         child: Text(
                           _errorMessage!,
                           style: TextStyle(
-                            color: AppColors.darkTextPrimary,
+                            color: primaryTextColor,
                             fontSize: scaleConfig.scaleText(14),
                           ),
                         ),
@@ -178,7 +191,7 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.pop(context),
           child: Text(
-            'Cancel',
+            'cancel'.tr,
             style: TextStyle(
               color: AppColors.accent,
               fontSize: scaleConfig.scaleText(14),
@@ -187,22 +200,23 @@ class EditMajorDialogState extends ConsumerState<EditMajorDialog> {
         ),
         TextButton(
           onPressed: _isLoading ? null : _updateMajor,
-          child: _isLoading
-              ? SizedBox(
-                  height: scaleConfig.scale(16),
-                  width: scaleConfig.scale(16),
-                  child: CircularProgressIndicator(
-                    color: AppColors.primary,
-                    strokeWidth: 2,
+          child:
+              _isLoading
+                  ? SizedBox(
+                    height: scaleConfig.scale(16),
+                    width: scaleConfig.scale(16),
+                    child: const CircularProgressIndicator(
+                      color: AppColors.primary,
+                      strokeWidth: 2,
+                    ),
+                  )
+                  : Text(
+                    'save_button'.tr,
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: scaleConfig.scaleText(14),
+                    ),
                   ),
-                )
-              : Text(
-                  'Save',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: scaleConfig.scaleText(14),
-                  ),
-                ),
         ),
       ],
     );
