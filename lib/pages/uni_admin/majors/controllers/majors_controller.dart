@@ -12,11 +12,12 @@ class MajorsController {
     }
 
     try {
-      final response = await _supabase
-          .from('uni_admin')
-          .select('university_id, universities(name)')
-          .eq('user_id', userId)
-          .single();
+      final response =
+          await _supabase
+              .from('uni_admin')
+              .select('university_id, universities(name)')
+              .eq('user_id', userId)
+              .single();
 
       final universityId = response['university_id'] as int?;
       if (universityId == null) {
@@ -25,7 +26,8 @@ class MajorsController {
 
       return {
         'university_id': universityId,
-        'university_name': response['universities']['name'] as String? ?? 'Unknown University',
+        'university_name':
+            response['universities']['name'] as String? ?? 'Unknown University',
       };
     } on PostgrestException catch (e) {
       throw Exception('Failed to load university: ${e.message}');
@@ -42,13 +44,14 @@ class MajorsController {
           .eq('university_id', universityId)
           .order('name', ascending: true);
 
-      final majors = (response as List<dynamic>)
-          .map((json) => Major.fromJson(json))
-          .where((major) => major.id != null)
-          .toList();
+      final majors =
+          (response as List<dynamic>)
+              .map((json) => Major.fromJson(json))
+              .where((major) => major.id != null)
+              .toList();
 
       if (majors.isEmpty && response.isNotEmpty) {
-        print('Warning: Some majors were filtered out due to missing id');
+        // print('Warning: Some majors were filtered out due to missing id');
       }
 
       await _cacheMajors(universityId, majors);
@@ -66,17 +69,20 @@ class MajorsController {
       final cachedData = prefs.getString('cached_majors_$universityId');
       if (cachedData != null) {
         final decoded = jsonDecode(cachedData) as List<dynamic>;
-        final majors = decoded
-            .map((json) => Major.fromJson(json))
-            .where((major) => major.id != null)
-            .toList();
-        print('Loaded ${majors.length} majors from cache for universityId: $universityId');
+        final majors =
+            decoded
+                .map((json) => Major.fromJson(json))
+                .where((major) => major.id != null)
+                .toList();
+        // print(
+        //   'Loaded ${majors.length} majors from cache for universityId: $universityId',
+        // );
         return majors.isNotEmpty ? majors : null;
       }
-      print('No cached majors found for universityId: $universityId');
+      // print('No cached majors found for universityId: $universityId');
       return null;
     } catch (e) {
-      print('Error loading cached majors: $e');
+      // print('Error loading cached majors: $e');
       return null;
     }
   }
@@ -86,27 +92,32 @@ class MajorsController {
       final prefs = await SharedPreferences.getInstance();
       final validMajors = majors.where((major) => major.id != null).toList();
       final jsonList = validMajors.map((major) => major.toJson()).toList();
-      await prefs.setString('cached_majors_$universityId', jsonEncode(jsonList));
-      print('Cached ${validMajors.length} majors for universityId: $universityId');
+      await prefs.setString(
+        'cached_majors_$universityId',
+        jsonEncode(jsonList),
+      );
+      // print(
+      //   'Cached ${validMajors.length} majors for universityId: $universityId',
+      // );
     } catch (e) {
-      print('Error caching majors: $e');
+      // print('Error caching majors: $e');
     }
   }
 
   Future<void> addMajor(Major major) async {
     try {
-      final response = await _supabase
-          .from('majors')
-          .insert(major.toJson())
-          .select('id, name, university_id')
-          .single();
+      final response =
+          await _supabase
+              .from('majors')
+              .insert(major.toJson())
+              .select('id, name, university_id')
+              .single();
 
       final newMajor = Major.fromJson(response);
       if (newMajor.id == null) {
         throw Exception('Inserted major is missing id');
       }
 
-      // Always update cache, even if it was empty
       final cachedMajors = await getCachedMajors(major.universityId) ?? [];
       cachedMajors.add(newMajor);
       await _cacheMajors(major.universityId, cachedMajors);
@@ -124,7 +135,6 @@ class MajorsController {
           .update({'name': name.trim()})
           .eq('id', majorId);
 
-      // Always update cache, creating it if necessary
       final cachedMajors = await getCachedMajors(universityId) ?? [];
       final index = cachedMajors.indexWhere((m) => m.id == majorId);
       final updatedMajor = Major(
