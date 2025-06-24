@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:unicurve/core/utils/bottom_nativgation/screen_index_provider.dart';
-import 'package:unicurve/core/utils/colors.dart';
-import 'package:unicurve/pages/admin_boss_dashboard_page.dart';
-import 'package:unicurve/pages/home/home_page.dart';
-import 'package:unicurve/pages/student/best_schedule_page.dart';
-import 'package:unicurve/pages/student/hub_gpa_page.dart';
-import 'package:unicurve/pages/student/student_profile_page.dart';
-import 'package:unicurve/pages/student/student_subjects_show.dart';
-import 'package:unicurve/pages/student/term_gpa_calculator_page.dart';
+import 'package:unicurve/pages/student/best_table_term/views/best_schedule_page.dart';
+import 'package:unicurve/pages/student/planning_tools/hub_gpa_page.dart';
+import 'package:unicurve/pages/student/student_profile/student_profile_page.dart';
+import 'package:unicurve/pages/student/subjects/student_subjects_show.dart';
 import 'student_bottom_nav_icon.dart';
 
 class StudentBottomBar extends ConsumerWidget {
@@ -23,27 +19,24 @@ class StudentBottomBar extends ConsumerWidget {
       const StudentProfilePage(),
     ];
 
-    // final adManager = InterstitialAdManager();
-    // adManager.loadAd();
-
     var screenIndex = ref.watch(studentCounterProvider);
 
     final double bottomBarHeight = MediaQuery.of(context).size.height * 0.07;
-
+    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
     return Scaffold(
       body: screens[screenIndex],
       bottomNavigationBar: BottomAppBar(
-        color: AppColors.darkBackground,
+        color: darkerColor,
         height: bottomBarHeight,
         shape: const CircularNotchedRectangle(),
         child: Padding(
           padding: const EdgeInsets.only(top: 7.5, bottom: 7.5),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
+            textDirection: TextDirection.ltr,
             children: [
               GestureDetector(
                 onTap: () {
-                  // ref.read(audioPlayerProvider).playTapSound();
                   ref.read(studentCounterProvider.notifier).setToZero();
                 },
                 child: StudentBottomNavIcon(
