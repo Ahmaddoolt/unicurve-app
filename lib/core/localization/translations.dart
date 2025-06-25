@@ -5,6 +5,13 @@ class AppTranslations extends Translations {
   Map<String, Map<String, String>> get keys => {
     'en_US': {
       // --- EXISTING KEYS ---
+      "sort_by_title": "Sort by",
+      "priority_label": "Priority",
+      "level_label": "Level",
+      "subject_name_label": "Subject Name",
+      "subject_code_label": "Subject Code",
+      "sort_subjects_tooltip": "Sort subjects",
+      "no_subjects_found": "No subjects found for your major.",
       // --- FORCE UPDATE DIALOG ---
       'update_required_title': 'Update Required',
       'update_required_message':
@@ -500,7 +507,6 @@ class AppTranslations extends Translations {
       'uncategorized_label': 'Uncategorized',
       'subject_details_title': 'Subject Details',
       'code_label': 'Code',
-      'level_label': 'Level',
       'type_label': 'Type',
       'open_for_reg_label': 'Open for Registration',
       'yes': 'Yes',
@@ -578,6 +584,13 @@ class AppTranslations extends Translations {
     },
     'ar_SA': {
       // --- EXISTING KEYS ---
+      "sort_by_title": "فرز حسب",
+      "priority_label": "الأولوية",
+      "level_label": "المستوى",
+      "subject_name_label": "اسم المادة",
+      "subject_code_label": "رمز المادة",
+      "sort_subjects_tooltip": "فرز المواد",
+      "no_subjects_found": "لا توجد مواد مسجلة لتخصصك.",
       // --- FORCE UPDATE DIALOG ---
       'update_required_title': 'تحديث إجباري',
       'update_required_message':
@@ -1056,7 +1069,6 @@ class AppTranslations extends Translations {
       'uncategorized_label': 'غير مصنف',
       'subject_details_title': 'تفاصيل المادة',
       'code_label': 'الرمز',
-      'level_label': 'المستوى',
       'type_label': 'النوع',
       'open_for_reg_label': 'متاحة للتسجيل',
       'yes': 'نعم',
