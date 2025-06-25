@@ -13,6 +13,8 @@ class ProfessorStatus {
   ProfessorStatus({required this.name, required this.isActive});
 }
 
+enum SubjectSortOrder { byPriority, byLevel, byName, byCode }
+
 class StudentSubjectsPage extends StatefulWidget {
   const StudentSubjectsPage({super.key});
 
@@ -31,6 +33,8 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
   String? _majorName;
   String? _errorMessage;
 
+  SubjectSortOrder _currentSortOrder = SubjectSortOrder.byPriority;
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +49,7 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
   }
 
   Future<void> _fetchStudentMajorAndSubjects() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -52,9 +57,7 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
 
     try {
       final userId = supabase.auth.currentUser?.id;
-      if (userId == null) {
-        throw Exception('error_user_not_logged_in'.tr);
-      }
+      if (userId == null) throw Exception('error_user_not_logged_in'.tr);
 
       final studentResponse =
           await supabase
@@ -64,15 +67,11 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
               .single();
 
       final majorId = studentResponse['major_id'];
-      if (majorId == null) {
-        throw Exception('error_not_in_major'.tr);
-      }
+      if (majorId == null) throw Exception('error_not_in_major'.tr);
 
       final majorData = studentResponse['majors'];
       final majorName =
-          majorData != null
-              ? majorData['name'] as String?
-              : 'your_major_fallback'.tr;
+          majorData?['name'] as String? ?? 'your_major_fallback'.tr;
 
       final results = await Future.wait([
         supabase
@@ -97,7 +96,6 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
       for (var subjectData in subjectsResponse) {
         final subjectMap = Map<String, dynamic>.from(subjectData);
         final rawProfessors = subjectMap['subject_professors'] as List<dynamic>;
-
         final List<ProfessorStatus> professors = [];
         for (final record in rawProfessors) {
           final professorData = record['professors'];
@@ -110,13 +108,11 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
             );
           }
         }
-
         professors.sort((a, b) {
           if (a.isActive && !b.isActive) return -1;
           if (!a.isActive && b.isActive) return 1;
           return a.name.compareTo(b.name);
         });
-
         subjectMap['professors'] = professors;
         processedSubjects.add(subjectMap);
       }
@@ -125,10 +121,10 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
         setState(() {
           _majorName = majorName;
           _subjects = processedSubjects;
-          _filteredSubjects = _subjects;
           _requirementsMap = requirementsMap;
           _isLoading = false;
         });
+        _applySortAndFilter();
       }
     } catch (e) {
       if (mounted) {
@@ -141,33 +137,140 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
     }
   }
 
+  void _sortSubjects() {
+    _subjects.sort((a, b) {
+      switch (_currentSortOrder) {
+        case SubjectSortOrder.byPriority:
+          final priorityA = a['priority'] as int? ?? -1;
+          final priorityB = b['priority'] as int? ?? -1;
+          return priorityB.compareTo(priorityA);
+        case SubjectSortOrder.byLevel:
+          final levelA = a['level'] as int? ?? 999;
+          final levelB = b['level'] as int? ?? 999;
+          return levelA.compareTo(levelB);
+        case SubjectSortOrder.byCode:
+          final codeA = a['code']?.toString() ?? '';
+          final codeB = b['code']?.toString() ?? '';
+          return codeA.compareTo(codeB);
+        case SubjectSortOrder.byName:
+          final nameA = a['name']?.toString() ?? '';
+          final nameB = b['name']?.toString() ?? '';
+          return nameA.compareTo(nameB);
+      }
+    });
+  }
+
+  void _applySortAndFilter() {
+    _sortSubjects();
+    _filterSubjects();
+  }
+
   void _filterSubjects() {
     final query = _searchController.text.toLowerCase();
     setState(() {
-      if (query.isEmpty) {
-        _filteredSubjects = _subjects;
-        return;
-      }
-
       _filteredSubjects =
-          _subjects.where((subject) {
-            final name = subject['name']?.toString().toLowerCase() ?? '';
-            final code = subject['code']?.toString().toLowerCase() ?? '';
-            final typeName =
-                _requirementsMap[subject['type']]?.toLowerCase() ?? '';
-
-            final List<ProfessorStatus> professors =
-                subject['professors'] ?? [];
-            final hasProfessorMatch = professors.any(
-              (prof) => prof.name.toLowerCase().contains(query),
-            );
-
-            return name.contains(query) ||
-                code.contains(query) ||
-                typeName.contains(query) ||
-                hasProfessorMatch;
-          }).toList();
+          query.isEmpty
+              ? List.from(_subjects)
+              : _subjects.where((subject) {
+                final name = subject['name']?.toString().toLowerCase() ?? '';
+                final code = subject['code']?.toString().toLowerCase() ?? '';
+                final typeName =
+                    _requirementsMap[subject['type']]?.toLowerCase() ?? '';
+                final professors =
+                    subject['professors'] as List<ProfessorStatus>;
+                final hasProfessorMatch = professors.any(
+                  (p) => p.name.toLowerCase().contains(query),
+                );
+                return name.contains(query) ||
+                    code.contains(query) ||
+                    typeName.contains(query) ||
+                    hasProfessorMatch;
+              }).toList();
     });
+  }
+
+  void _showSortOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'sort_by_title'.tr,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildSortOption(
+                title: 'priority_label'.tr,
+                icon: Icons.star_border,
+                order: SubjectSortOrder.byPriority,
+              ),
+              _buildSortOption(
+                title: 'level_label'.tr,
+                icon: Icons.layers_outlined,
+                order: SubjectSortOrder.byLevel,
+              ),
+              _buildSortOption(
+                title: 'subject_name_label'.tr,
+                icon: Icons.sort_by_alpha,
+                order: SubjectSortOrder.byName,
+              ),
+              _buildSortOption(
+                title: 'subject_code_label'.tr,
+                icon: Icons.pin_outlined,
+                order: SubjectSortOrder.byCode,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSortOption({
+    required String title,
+    required IconData icon,
+    required SubjectSortOrder order,
+  }) {
+    final bool isSelected = _currentSortOrder == order;
+    return ListTile(
+      leading: Icon(
+        icon,
+        color:
+            isSelected ? AppColors.primary : Theme.of(context).iconTheme.color,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color:
+              isSelected
+                  ? AppColors.primary
+                  : Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+      ),
+      trailing:
+          isSelected ? const Icon(Icons.check, color: AppColors.primary) : null,
+      onTap: () {
+        Navigator.pop(context);
+        if (!isSelected) {
+          setState(() => _currentSortOrder = order);
+          _applySortAndFilter();
+        }
+      },
+    );
   }
 
   void _showSubjectDetailsDialog(Map<String, dynamic> subject) {
@@ -290,7 +393,6 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
         ),
       );
     }
-
     return _buildDetailRow(
       icon: Icons.school_outlined,
       label: 'professors_label'.tr,
@@ -385,19 +487,27 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
         actions: [
           IconButton(
             icon: Icon(
+              Icons.sort,
+              color: AppColors.primary,
+              size: scaleConfig.scale(24),
+            ),
+            tooltip: 'sort_subjects_tooltip'.tr,
+            onPressed: _isLoading ? null : _showSortOptions,
+          ),
+          IconButton(
+            icon: Icon(
               Icons.account_tree_outlined,
               color: AppColors.primary,
               size: scaleConfig.scale(22),
             ),
             tooltip: 'view_curriculum_plan_tooltip'.tr,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const StudentCurriculumTreePage(),
+            onPressed:
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const StudentCurriculumTreePage(),
+                  ),
                 ),
-              );
-            },
           ),
         ],
       ),
@@ -444,8 +554,11 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
                           _filteredSubjects.isEmpty
                               ? Center(
                                 child: Text(
-                                  'no_subjects_match_search'.tr,
+                                  _searchController.text.isEmpty
+                                      ? 'no_subjects_found'.tr
+                                      : 'no_subjects_match_search'.tr,
                                   style: TextStyle(color: secondaryTextColor),
+                                  textAlign: TextAlign.center,
                                 ),
                               )
                               : ListView.builder(
