@@ -7,16 +7,18 @@ import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/domain/models/subject.dart';
 import 'subjects_list.dart';
 import 'relationships_panel.dart';
-import 'edit_subject_dialog.dart';
+import '../edit_subject_dialog.dart';
 
 class ManageSubjectsRelationshipsPage extends StatefulWidget {
   final List<Map<String, dynamic>> subjects;
   final int? majorId;
+  final int universityId;
 
   const ManageSubjectsRelationshipsPage({
     super.key,
     required this.subjects,
     this.majorId,
+    required this.universityId,
   });
 
   @override
@@ -39,23 +41,42 @@ class ManageSubjectsRelationshipsPageState
     _subjects = widget.subjects;
   }
 
-  Future<void> _fetchRelationships(int subjectId) async {
+  Future<void> _fetchDataForSelectedSubject(int subjectId) async {
     setState(() => _isLoading = true);
     try {
-      final response = await supabase
+      final relationshipsResponse = await supabase
           .from('subject_relationships')
           .select('target_subject_id, relationship_type')
           .eq('source_subject_id', subjectId);
 
-      final availableSubjects = await supabase
+      final majorsResponse = await supabase
+          .from('majors')
+          .select('id')
+          .eq('university_id', widget.universityId);
+
+      if (majorsResponse.isEmpty) {
+        if (mounted) setState(() => _availableSubjects.clear());
+        return;
+      }
+      final List<int> majorIds =
+          majorsResponse.map((m) => m['id'] as int).toList();
+
+      if (majorIds.isEmpty) {
+        if (mounted) setState(() => _availableSubjects.clear());
+        return;
+      }
+
+      final orFilter = majorIds.map((id) => 'major_id.eq.$id').join(',');
+      final availableSubjectsResponse = await supabase
           .from('subjects')
           .select('id, code, name')
+          .or(orFilter)
           .neq('id', subjectId);
 
       if (mounted) {
         setState(() {
           _relationships =
-              response
+              relationshipsResponse
                   .map(
                     (r) => {
                       'subject_id': r['target_subject_id'].toString(),
@@ -63,8 +84,9 @@ class ManageSubjectsRelationshipsPageState
                     },
                   )
                   .toList();
+
           _availableSubjects =
-              availableSubjects
+              availableSubjectsResponse
                   .map(
                     (s) => {
                       'id': s['id'].toString(),
@@ -72,7 +94,6 @@ class ManageSubjectsRelationshipsPageState
                       'name': s['name'],
                     },
                   )
-                  .toSet()
                   .toList();
           _isLoading = false;
         });
@@ -172,12 +193,13 @@ class ManageSubjectsRelationshipsPageState
   ) async {
     setState(() => _isLoading = true);
     try {
+      final targetIdInt = int.parse(targetSubjectId);
       final existingRelationship =
           await supabase
               .from('subject_relationships')
               .select('id')
               .eq('source_subject_id', sourceSubjectId)
-              .eq('target_subject_id', targetSubjectId)
+              .eq('target_subject_id', targetIdInt)
               .eq('relationship_type', relationshipType)
               .maybeSingle();
 
@@ -191,17 +213,19 @@ class ManageSubjectsRelationshipsPageState
 
       await supabase.from('subject_relationships').insert({
         'source_subject_id': sourceSubjectId,
-        'target_subject_id': targetSubjectId,
+        'target_subject_id': targetIdInt,
         'relationship_type': relationshipType,
       });
 
-      final response = await supabase
-          .from('subject_relationships')
-          .select('id')
-          .eq('source_subject_id', sourceSubjectId)
-          .eq('relationship_type', 'PREREQUISITE');
+      final countResponse =
+          await supabase
+              .from('subject_relationships')
+              .select('id')
+              .eq('source_subject_id', sourceSubjectId)
+              .eq('relationship_type', 'PREREQUISITE')
+              .count();
 
-      final unlocksCount = response.length;
+      final unlocksCount = countResponse.count;
       await supabase
           .from('subjects')
           .update({'priority': unlocksCount})
@@ -244,20 +268,23 @@ class ManageSubjectsRelationshipsPageState
   ) async {
     setState(() => _isLoading = true);
     try {
+      final targetIdInt = int.parse(targetSubjectId);
       await supabase
           .from('subject_relationships')
           .delete()
           .eq('source_subject_id', sourceSubjectId)
-          .eq('target_subject_id', targetSubjectId)
+          .eq('target_subject_id', targetIdInt)
           .eq('relationship_type', relationshipType);
 
-      final response = await supabase
-          .from('subject_relationships')
-          .select('id')
-          .eq('source_subject_id', sourceSubjectId)
-          .eq('relationship_type', 'PREREQUISITE');
+      final countResponse =
+          await supabase
+              .from('subject_relationships')
+              .select('id')
+              .eq('source_subject_id', sourceSubjectId)
+              .eq('relationship_type', 'PREREQUISITE')
+              .count();
 
-      final unlocksCount = response.length;
+      final unlocksCount = countResponse.count;
       await supabase
           .from('subjects')
           .update({'priority': unlocksCount})
@@ -335,9 +362,7 @@ class ManageSubjectsRelationshipsPageState
       backgroundColor: darkerColor,
       appBar: AppBar(
         leading: IconButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
+          onPressed: () => Navigator.of(context).pop(),
           icon: Icon(Icons.arrow_back, color: primaryTextColor),
         ),
         centerTitle: true,
@@ -360,9 +385,7 @@ class ManageSubjectsRelationshipsPageState
             onPressed:
                 _isLoading
                     ? null
-                    : () {
-                      setState(() => _subjects = widget.subjects);
-                    },
+                    : () => setState(() => _subjects = widget.subjects),
             tooltip: 'refresh_button_tooltip'.tr,
           ),
         ],
@@ -381,7 +404,7 @@ class ManageSubjectsRelationshipsPageState
                   onSubjectTap: (subject) {
                     setState(() {
                       _selectedSubject = Subject.fromMap(subject);
-                      _fetchRelationships(subject['id']);
+                      _fetchDataForSelectedSubject(subject['id']);
                     });
                   },
                   onEditSubject: _editSubject,
@@ -403,7 +426,8 @@ class ManageSubjectsRelationshipsPageState
           ),
           if (_isLoading)
             Container(
-              color: darkerColor,
+              // ignore: deprecated_member_use
+              color: darkerColor.withOpacity(0.7),
               child: const Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),

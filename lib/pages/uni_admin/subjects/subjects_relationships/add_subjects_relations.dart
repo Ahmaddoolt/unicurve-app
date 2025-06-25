@@ -8,8 +8,13 @@ import 'package:unicurve/domain/models/subject.dart';
 
 class AddSubjectRelationsPage extends StatefulWidget {
   final Subject subject;
+  final int universityId;
 
-  const AddSubjectRelationsPage({super.key, required this.subject});
+  const AddSubjectRelationsPage({
+    super.key,
+    required this.subject,
+    required this.universityId,
+  });
 
   @override
   AddSubjectRelationsPageState createState() => AddSubjectRelationsPageState();
@@ -40,13 +45,29 @@ class AddSubjectRelationsPageState extends State<AddSubjectRelationsPage> {
   Future<void> _fetchAvailableSubjects() async {
     setState(() => _isLoading = true);
     try {
-      if (widget.subject.majorId == null) {
-        throw Exception("Subject does not have a major ID.");
+      final majorsResponse = await supabase
+          .from('majors')
+          .select('id')
+          .eq('university_id', widget.universityId);
+
+      if (majorsResponse.isEmpty) {
+        if (mounted) setState(() => _availableSubjects.clear());
+        return;
       }
+
+      final List<int> majorIds =
+          majorsResponse.map((m) => m['id'] as int).toList();
+      if (majorIds.isEmpty) {
+        if (mounted) setState(() => _availableSubjects.clear());
+        return;
+      }
+
+      final orFilter = majorIds.map((id) => 'major_id.eq.$id').join(',');
+
       final response = await supabase
           .from('subjects')
           .select('id, code, name')
-          .eq('major_id', widget.subject.majorId!)
+          .or(orFilter)
           .neq('id', widget.subject.id!);
 
       if (mounted) {
@@ -152,7 +173,6 @@ class AddSubjectRelationsPageState extends State<AddSubjectRelationsPage> {
             0,
             duration: const Duration(milliseconds: 300),
           );
-
           _formKey.currentState?.reset();
           _selectedSubjectId = null;
           _selectedType = null;
@@ -209,14 +229,15 @@ class AddSubjectRelationsPageState extends State<AddSubjectRelationsPage> {
     setState(() => _isLoading = true);
 
     try {
-      final postgrestResponse = await supabase
-          .from('subject_relationships')
-          .select()
-          .eq('target_subject_id', widget.subject.id!)
-          .eq('relationship_type', 'PREREQUISITE')
-          .count(CountOption.exact);
+      final countResponse =
+          await supabase
+              .from('subject_relationships')
+              .select('id')
+              .eq('source_subject_id', widget.subject.id!)
+              .eq('relationship_type', 'PREREQUISITE')
+              .count();
 
-      final unlocksCount = postgrestResponse.count;
+      final unlocksCount = countResponse.count;
 
       await supabase
           .from('subjects')
@@ -224,7 +245,7 @@ class AddSubjectRelationsPageState extends State<AddSubjectRelationsPage> {
           .eq('id', widget.subject.id!);
 
       if (mounted) {
-        Navigator.popUntil(context, (route) => route.isFirst);
+        Navigator.of(context).pop(true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.primary,
@@ -371,7 +392,7 @@ class AddSubjectRelationsPageState extends State<AddSubjectRelationsPage> {
           if (_isLoading)
             Container(
               // ignore: deprecated_member_use
-              color: darkerColor.withOpacity(0.5),
+              color: (darkerColor).withOpacity(0.5),
               child: const Center(
                 child: CircularProgressIndicator(color: AppColors.primary),
               ),
@@ -497,7 +518,7 @@ class AddSubjectRelationsPageState extends State<AddSubjectRelationsPage> {
             Expanded(
               child: ElevatedButton(
                 onPressed:
-                    _isLoading ? null : () => Navigator.pop(context, true),
+                    _isLoading ? null : () => Navigator.pop(context, false),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: lighterColor,
                   foregroundColor: AppColors.primary,
