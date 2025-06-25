@@ -7,7 +7,7 @@ import 'package:unicurve/core/utils/custom_appbar.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/domain/models/subject.dart';
 import 'package:unicurve/pages/uni_admin/providers/admin_university_provider.dart';
-import 'package:unicurve/pages/uni_admin/subjects/add_subjects_relations.dart';
+import 'package:unicurve/pages/uni_admin/subjects/subjects_relationships/add_subjects_relations.dart';
 
 class AddSubjectBasicPage extends ConsumerStatefulWidget {
   const AddSubjectBasicPage({super.key});
@@ -37,6 +37,8 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
   bool _isLoadingRequirements = false;
   bool _isSubmitting = false;
   String? _errorMessage;
+
+  int? _universityId;
 
   @override
   void initState() {
@@ -73,6 +75,7 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
 
       if (mounted) {
         setState(() {
+          _universityId = universityId;
           _majors = List<Map<String, dynamic>>.from(response);
           _isLoadingMajors = false;
         });
@@ -120,12 +123,14 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
       _showError('add_subject_error_fill_fields'.tr);
       return;
     }
-    _formKey.currentState!.save();
+    if (_universityId == null) {
+      _showError('add_subject_error_no_university'.tr);
+      return;
+    }
 
-    setState(() {
-      _isSubmitting = true;
-      _errorMessage = null;
-    });
+    _formKey.currentState!.save();
+    setState(() => _isSubmitting = true);
+    _errorMessage = null;
 
     try {
       final subject = Subject(
@@ -148,18 +153,30 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
 
       if (mounted) {
         final newSubject = Subject.fromMap(response);
-        Navigator.pushReplacement(
+
+        final bool? success = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
-            builder: (context) => AddSubjectRelationsPage(subject: newSubject),
+            builder:
+                (context) => AddSubjectRelationsPage(
+                  subject: newSubject,
+                  universityId: _universityId!,
+                ),
           ),
         );
+
+        if (success == true && mounted) {
+          Navigator.of(context).pop(true);
+        }
       }
     } catch (e) {
       if (mounted) {
         _showError(
           'add_subject_error_submit'.trParams({'error': e.toString()}),
         );
+      }
+    } finally {
+      if (mounted) {
         setState(() => _isSubmitting = false);
       }
     }
@@ -321,8 +338,8 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
     Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
 
     if (_isLoadingRequirements) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8.0),
         child: Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         ),

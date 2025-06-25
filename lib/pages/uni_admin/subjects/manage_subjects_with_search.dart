@@ -6,7 +6,8 @@ import 'package:unicurve/core/utils/custom_floadt_action_button.dart';
 import 'package:unicurve/core/utils/custom_snackbar.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/pages/uni_admin/subjects/add_subject.dart';
-import 'package:unicurve/pages/uni_admin/subjects/manage_subjects_relationships.dart';
+import 'package:unicurve/pages/uni_admin/subjects/subjects_relationships/manage_subjects_relationships.dart'
+    as rel_manager;
 import 'package:unicurve/pages/uni_admin/subjects/subjects_list_for_search_page.dart';
 
 class SearchSubjectsPage extends StatefulWidget {
@@ -25,6 +26,8 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
   final TextEditingController _searchController = TextEditingController();
   String? _majorName;
   bool _isLoading = false;
+
+  int? _universityId;
 
   @override
   void initState() {
@@ -46,13 +49,14 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
       final majorResponse =
           await supabase
               .from('majors')
-              .select('name')
+              .select('name, university_id')
               .eq('id', widget.majorId)
               .single();
 
       if (mounted) {
         setState(() {
           _majorName = majorResponse['name'];
+          _universityId = majorResponse['university_id'];
           _dataFutures = Future.wait([
             _fetchSubjectsAndProfessors(),
             _fetchRequirementsMap(),
@@ -104,7 +108,6 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
             final codeMatch = subject['code'].toString().toLowerCase().contains(
               query,
             );
-
             final professorsList =
                 (subject['subject_professors'] as List?) ?? [];
             final professorMatch = professorsList.any((profLink) {
@@ -112,7 +115,6 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
               return prof != null &&
                   prof['name'].toString().toLowerCase().contains(query);
             });
-
             return nameMatch || codeMatch || professorMatch;
           }).toList();
     });
@@ -128,7 +130,6 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
       );
       return;
     }
-
     Color? lighterColor = Theme.of(context).cardColor;
     Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
     Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
@@ -166,7 +167,6 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
     );
 
     if (confirm != true) return;
-
     if (mounted) setState(() => _isLoading = true);
     try {
       await supabase
@@ -366,7 +366,6 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
         professorLinks
             .map((link) => link['professors']['name'] as String)
             .toList();
-
     Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
     Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
 
@@ -534,7 +533,9 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
         onPressed: () async {
           final result = await Navigator.push<bool>(
             context,
-            MaterialPageRoute(builder: (context) => AddSubjectBasicPage()),
+            MaterialPageRoute(
+              builder: (context) => const AddSubjectBasicPage(),
+            ),
           );
           if (result == true) {
             await _fetchAllData();
@@ -558,15 +559,20 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
           IconButton(
             icon: const Icon(Icons.lan_outlined, color: AppColors.primary),
             onPressed:
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => ManageSubjectsRelationshipsPage(
-                          subjects: _allSubjects,
-                        ),
-                  ),
-                ),
+                (_universityId == null || _isLoading)
+                    ? null
+                    : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) =>
+                                rel_manager.ManageSubjectsRelationshipsPage(
+                                  subjects: _allSubjects,
+                                  universityId: _universityId!,
+                                  majorId: widget.majorId,
+                                ),
+                      ),
+                    ),
           ),
         ],
       ),
