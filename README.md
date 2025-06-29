@@ -182,17 +182,6 @@ The backend is supported by a relational database schema designed for scalabilit
 <summary><strong>📂 Project Structure</strong></summary>
 
 The project is organized using a hybrid architecture that combines a layered approach with feature-based modules for clarity and scalability.
-lib
-├── core/ # Shared utilities, constants, themes, and extensions.
-├── data/
-│ └── services/ # Data layer: Repositories and services for backend communication.
-├── domain/
-│ └── models/ # Domain layer: Core business entities and data models.
-├── onboarding/ # Feature module for the onboarding/intro flow.
-├── pages/ # Contains the primary UI screens for the app's main features.
-├── settings/ # Feature module for the settings screen.
-└── main.dart # The entry point of the Flutter application.
-
 
 -   **`core/`**: Shared code, utilities, constants, theme definitions, and core extensions used across the entire application.
 -   **`data/services/`**: The Data layer. Contains repository implementations and services that handle communication with the backend (Supabase) and other external data sources.
