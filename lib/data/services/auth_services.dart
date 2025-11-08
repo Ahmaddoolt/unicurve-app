@@ -110,6 +110,17 @@ class AuthService {
       throw AuthException(e.message);
     }
   }
+  
+  // This is now the single function for ALL user deletions.
+  Future<void> deleteCurrentUserAccount() async {
+    try {
+      await _supabase.rpc('delete_user_account');
+    } on PostgrestException catch (e) {
+      throw Exception('Failed to delete account: ${e.message}');
+    } catch (e) {
+      throw Exception('An unexpected error occurred during account deletion.');
+    }
+  }
 
   Future<List<dynamic>> getUniversities(String location) async {
     try {

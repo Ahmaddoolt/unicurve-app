@@ -1,3 +1,5 @@
+// lib/pages/auth/signup/student_signup/student_signup_controller.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -137,13 +139,12 @@ class SignupController extends GetxController {
     int universityId,
   ) async {
     try {
-      final response =
-          await Supabase.instance.client
-              .from('students')
-              .select('id')
-              .eq('uni_number', uniNumber)
-              .eq('university_id', universityId)
-              .maybeSingle();
+      final response = await Supabase.instance.client
+          .from('students')
+          .select('id')
+          .eq('uni_number', uniNumber)
+          .eq('university_id', universityId)
+          .maybeSingle();
       return response == null;
     } catch (_) {
       return false;
@@ -164,6 +165,7 @@ class SignupController extends GetxController {
       return;
     }
 
+    isLoading.value = true;
     final uniNumber = universityNumberController.text.trim();
     final universityId = selectedUniversity!['id'] as int;
 
@@ -172,6 +174,7 @@ class SignupController extends GetxController {
       universityId,
     );
     if (!isUnique) {
+      isLoading.value = false;
       showFeedbackSnackbar(
         Get.context!,
         'error_uni_number_exists'.tr,
@@ -190,7 +193,6 @@ class SignupController extends GetxController {
       password: passwordController.text,
     );
 
-    isLoading.value = true;
     try {
       final userId = await _authService.signUp(student: student);
       if (userId != null) {

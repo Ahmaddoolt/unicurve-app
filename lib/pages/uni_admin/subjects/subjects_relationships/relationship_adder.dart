@@ -1,6 +1,9 @@
+// lib/pages/uni_admin/subjects/subjects_relationships/relationship_adder.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_button.dart';
 import 'package:unicurve/core/utils/custom_snackbar.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 
@@ -21,6 +24,7 @@ class RelationshipAdder extends StatefulWidget {
 }
 
 class RelationshipAdderState extends State<RelationshipAdder> {
+  final _formKey = GlobalKey<FormState>();
   String? selectedSubjectId;
   String? selectedType;
 
@@ -28,161 +32,126 @@ class RelationshipAdderState extends State<RelationshipAdder> {
     setState(() {
       selectedSubjectId = null;
       selectedType = null;
+      _formKey.currentState?.reset();
     });
+  }
+
+  void _handleAddRelationship() {
+    if (_formKey.currentState?.validate() ?? false) {
+      widget.onAddRelationship(
+        selectedSubjectId!,
+        selectedType!,
+      );
+      _resetForm();
+    } else {
+      showFeedbackSnackbar(
+        context,
+        'add_relations_error_select_all'.tr,
+        isError: true,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final scaleConfig = context.scaleConfig;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final primaryTextColor = theme.textTheme.bodyLarge?.color;
+    final secondaryTextColor = theme.textTheme.bodyMedium?.color;
 
-    return Card(
-      elevation: 6,
-      color: lighterColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(scaleConfig.scale(16)),
-        child: Column(
-          children: [
-            DropdownButtonFormField<String>(
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'subject_label'.tr,
-                labelStyle: TextStyle(
-                  color: secondaryTextColor,
-                  fontSize: scaleConfig.scaleText(12),
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                  borderSide: const BorderSide(color: AppColors.primary),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                  borderSide: BorderSide(
-                    // ignore: deprecated_member_use
-                    color: AppColors.primary.withOpacity(0.5),
-                  ),
-                ),
-              ),
-              dropdownColor: lighterColor,
-              items:
-                  widget.availableSubjects.map((subject) {
-                    return DropdownMenuItem<String>(
-                      value: subject['id'].toString(),
-                      child: Text(
-                        '${subject['name']} (${subject['code']})',
-                        style: TextStyle(
-                          color: primaryTextColor,
-                          fontSize: scaleConfig.scaleText(12),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  }).toList(),
-              onChanged:
-                  widget.isLoading
-                      ? null
-                      : (value) => setState(() => selectedSubjectId = value),
-              validator:
-                  (value) =>
-                      value == null
-                          ? 'add_relations_error_select_subject'.tr
-                          : null,
-            ),
-            SizedBox(height: scaleConfig.scale(12)),
-            DropdownButtonFormField<String>(
-              isExpanded: true,
-              decoration: InputDecoration(
-                labelText: 'add_relations_type_label'.tr,
-                labelStyle: TextStyle(
-                  color: secondaryTextColor,
-                  fontSize: scaleConfig.scaleText(12),
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                  borderSide: const BorderSide(color: AppColors.primary),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                  borderSide: BorderSide(
-                    // ignore: deprecated_member_use
-                    color: AppColors.primary.withOpacity(0.5),
-                  ),
-                ),
-              ),
-              value: selectedType,
-              dropdownColor: lighterColor,
-              items: [
-                DropdownMenuItem(
-                  value: 'PREREQUISITE',
-                  child: Text(
-                    'add_relations_prerequisite'.tr,
-                    style: TextStyle(
-                      color: primaryTextColor,
-                      fontSize: scaleConfig.scaleText(12),
-                    ),
-                  ),
-                ),
-              ],
-              onChanged:
-                  widget.isLoading
-                      ? null
-                      : (value) => setState(() => selectedType = value),
-              validator:
-                  (value) =>
-                      value == null
-                          ? 'add_relations_error_select_type'.tr
-                          : null,
-            ),
-            SizedBox(height: scaleConfig.scale(20)),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed:
-                    widget.isLoading
-                        ? null
-                        : () {
-                          if (selectedSubjectId != null &&
-                              selectedType != null) {
-                            widget.onAddRelationship(
-                              selectedSubjectId!,
-                              selectedType!,
-                            );
-                            _resetForm();
-                          } else {
-                            showFeedbackSnackbar(
-                              context,
-                              'add_relations_error_select_all'.tr,
-                              isError: true,
-                            );
-                          }
-                        },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: EdgeInsets.symmetric(
-                    vertical: scaleConfig.scale(14),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                  ),
-                  elevation: 2,
-                ),
-                child: Text(
-                  'add_relations_add_button'.tr,
-                  style: TextStyle(
-                    fontSize: scaleConfig.scaleText(14),
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
+    // --- THE KEY FIX IS HERE: Replicating the exact style from your reference ---
+    InputDecoration customInputDecoration({required String hint}) {
+      return InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: secondaryTextColor),
+        filled: true,
+        fillColor:
+            isDarkMode ? Colors.black.withOpacity(0.2) : AppColors.lightSurface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: BorderSide.none,
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide: BorderSide(
+              color: isDarkMode
+                  ? AppColors.gradientBlueMid.withOpacity(0.5)
+                  : Colors.grey.shade300,
+              width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.0),
+          borderSide:
+              const BorderSide(color: AppColors.gradientBlueMid, width: 2),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16.0, vertical: 15.0),
+      );
+    }
+
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          DropdownButtonFormField<String>(
+            value: selectedSubjectId,
+            isExpanded: true,
+            decoration: customInputDecoration(hint: 'select_hint'.tr),
+            // --- Style fixes for the menu itself ---
+            dropdownColor:
+                isDarkMode ? const Color(0xFF2D3748) : theme.cardColor,
+            style: TextStyle(color: primaryTextColor, fontSize: 16),
+            icon: Icon(Icons.keyboard_arrow_down, color: primaryTextColor),
+            items: widget.availableSubjects.map((subject) {
+              return DropdownMenuItem<String>(
+                value: subject['id'].toString(),
+                child: Text(
+                  '${subject['code']} - ${subject['name']}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: widget.isLoading
+                ? null
+                : (value) => setState(() => selectedSubjectId = value),
+            validator: (value) =>
+                value == null ? 'add_relations_error_select_subject'.tr : null,
+          ),
+          SizedBox(height: scaleConfig.scale(12)),
+          DropdownButtonFormField<String>(
+            value: selectedType,
+            decoration:
+                customInputDecoration(hint: 'add_relations_type_label'.tr),
+            // --- Style fixes for the menu itself ---
+            dropdownColor:
+                isDarkMode ? const Color(0xFF2D3748) : theme.cardColor,
+            style: TextStyle(color: primaryTextColor, fontSize: 16),
+            icon: Icon(Icons.keyboard_arrow_down, color: primaryTextColor),
+            items: [
+              DropdownMenuItem(
+                value: 'PREREQUISITE',
+                child: Text('add_relations_prerequisite'.tr),
+              ),
+            ],
+            onChanged: widget.isLoading
+                ? null
+                : (value) => setState(() => selectedType = value),
+            validator: (value) =>
+                value == null ? 'add_relations_error_select_type'.tr : null,
+          ),
+          SizedBox(height: scaleConfig.scale(20)),
+          SizedBox(
+            width: double.infinity,
+            child: CustomButton(
+              onPressed: widget.isLoading ? () {} : _handleAddRelationship,
+              text: 'add_relations_add_button'.tr,
+              gradient: widget.isLoading
+                  ? AppColors.disabledGradient
+                  : AppColors.primaryGradient,
+            ),
+          ),
+        ],
       ),
     );
   }

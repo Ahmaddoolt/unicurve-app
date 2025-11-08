@@ -24,7 +24,7 @@ class MajorListTile extends StatelessWidget {
       color: darkerColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
-        side: const BorderSide(color: AppColors.primaryDark, width: 1.5),
+        side: const BorderSide(color: AppColors.darkBackground, width: 1.5),
       ),
       child: ListTile(
         contentPadding: EdgeInsets.symmetric(

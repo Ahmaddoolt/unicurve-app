@@ -1,46 +1,53 @@
+// lib/pages/student/planning_tools/term_gpa_calculator_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_appbar.dart';
+import 'package:unicurve/core/utils/custom_button.dart';
+import 'package:unicurve/core/utils/custom_floadt_action_button.dart';
 import 'package:unicurve/core/utils/custom_snackbar.dart';
+import 'package:unicurve/core/utils/glass_card.dart';
+import 'package:unicurve/core/utils/glass_loading_overlay.dart';
+import 'package:unicurve/core/utils/gradient_scaffold.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/pages/student/student_profile/providers/academic_profile_provider.dart';
 import 'package:unicurve/pages/student/student_profile/providers/university_cache_service.dart';
 
 final availableSubjectsProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-      final profileAsyncValue = ref.watch(academicProfileProvider);
+  final profileAsyncValue = ref.watch(academicProfileProvider);
 
-      return profileAsyncValue.when(
-        data: (profile) async {
-          final supabase = Supabase.instance.client;
-          final userId = supabase.auth.currentUser?.id;
-          if (userId == null) throw Exception('User not logged in.');
+  return profileAsyncValue.when(
+    data: (profile) async {
+      final supabase = Supabase.instance.client;
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not logged in.');
 
-          final majorId = profile.studentData?['major_id'];
-          if (majorId == null) throw Exception('error_not_in_major'.tr);
+      final majorId = profile.studentData?['major_id'];
+      if (majorId == null) throw Exception('error_not_in_major'.tr);
 
-          final subjectsResponse = await supabase
-              .from('subjects')
-              .select('id, name, hours')
-              .eq('major_id', majorId);
+      final subjectsResponse = await supabase
+          .from('subjects')
+          .select('id, name, hours')
+          .eq('major_id', majorId);
 
-          final takenIds =
-              profile.takenSubjects
-                  .where((s) => s['subjects'] != null)
-                  .map((s) => s['subjects']['id'])
-                  .toSet();
+      final takenIds = profile.takenSubjects
+          .where((s) => s['subjects'] != null)
+          .map((s) => s['subjects']['id'])
+          .toSet();
 
-          return List<Map<String, dynamic>>.from(
-            subjectsResponse,
-          ).where((s) => !takenIds.contains(s['id'])).toList();
-        },
-        loading: () => Future.value([]),
-        error: (e, st) => throw e,
-      );
-    });
+      return List<Map<String, dynamic>>.from(
+        subjectsResponse,
+      ).where((s) => !takenIds.contains(s['id'])).toList();
+    },
+    loading: () => Future.value([]),
+    error: (e, st) => throw e,
+  );
+});
 
 class SubjectEntry {
   final int id;
@@ -157,94 +164,91 @@ class _TermGpaCalculatorPageState extends ConsumerState<TermGpaCalculatorPage> {
     AcademicProfile profile,
   ) {
     int? subjectToAddId;
-    final availableSubjects =
-        allSubjects
-            .where((s) => !_selectedSubjects.any((ss) => ss.id == s['id']))
-            .toList();
+    final availableSubjects = allSubjects
+        .where((s) => !_selectedSubjects.any((ss) => ss.id == s['id']))
+        .toList();
 
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: darkerColor,
-              title: Text(
-                'add_subject_dialog_title'.tr,
-                style: TextStyle(color: primaryTextColor),
-              ),
-              content: DropdownButtonFormField<int>(
-                hint: Text(
-                  'select_subject_hint'.tr,
-                  style: TextStyle(color: secondaryTextColor),
-                ),
-                dropdownColor: lighterColor,
-                style: TextStyle(color: primaryTextColor),
-                items:
-                    availableSubjects
-                        .map(
-                          (s) => DropdownMenuItem<int>(
-                            value: s['id'],
-                            child: Text(s['name']),
-                          ),
-                        )
+        return AlertDialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          contentPadding: EdgeInsets.zero,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: GlassCard(
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('add_subject_dialog_title'.tr,
+                      style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 24),
+                  DropdownButtonFormField<int>(
+                    hint: Text('select_subject_hint'.tr),
+                    style: theme.textTheme.bodyLarge,
+                    dropdownColor:
+                        isDarkMode ? const Color(0xFF2D3748) : theme.cardColor,
+                    icon: Icon(Icons.keyboard_arrow_down,
+                        color: theme.textTheme.bodyMedium?.color),
+                    items: availableSubjects
+                        .map((s) => DropdownMenuItem<int>(
+                              value: s['id'],
+                              child: Text(s['name']),
+                            ))
                         .toList(),
-                onChanged: (value) => subjectToAddId = value,
+                    onChanged: (value) => subjectToAddId = value,
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text('cancel'.tr),
+                      ),
+                      const SizedBox(width: 8),
+                      CustomButton(
+                        onPressed: () {
+                          if (subjectToAddId != null) {
+                            final subjectData = allSubjects
+                                .firstWhere((s) => s['id'] == subjectToAddId);
+                            final int subjectHours =
+                                subjectData['hours'] as int? ?? 0;
+                            final newHours = _termHours + subjectHours;
+                            if (newHours > 21) {
+                              showFeedbackSnackbar(
+                                  context, 'error_term_hours_exceed'.tr,
+                                  isError: true);
+                              return;
+                            }
+                            setState(() {
+                              _selectedSubjects.add(SubjectEntry(
+                                id: subjectData['id'],
+                                name: subjectData['name'],
+                                hours: subjectHours,
+                              ));
+                            });
+                            _recalculateAll(profile);
+                            Navigator.pop(context);
+                          }
+                        },
+                        text: 'add_button'.tr,
+                        gradient: AppColors.primaryGradient,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'cancel'.tr,
-                    style: const TextStyle(color: AppColors.accent),
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                  ),
-                  onPressed: () {
-                    if (subjectToAddId != null) {
-                      final subjectData = allSubjects.firstWhere(
-                        (s) => s['id'] == subjectToAddId,
-                      );
-                      final int subjectHours =
-                          subjectData['hours'] as int? ?? 0;
-                      final newHours = _termHours + subjectHours;
-                      if (newHours > 21) {
-                        showFeedbackSnackbar(
-                          context,
-                          'error_term_hours_exceed'.tr,
-                          isError: true,
-                        );
-                        return;
-                      }
-                      setState(() {
-                        _selectedSubjects.add(
-                          SubjectEntry(
-                            id: subjectData['id'],
-                            name: subjectData['name'],
-                            hours: subjectHours,
-                          ),
-                        );
-                      });
-                      _recalculateAll(profile);
-                      Navigator.pop(context);
-                    }
-                  },
-                  child: Text(
-                    'add_button'.tr,
-                    style: TextStyle(color: primaryTextColor),
-                  ),
-                ),
-              ],
-            );
-          },
+            ),
+          ),
         );
       },
     );
@@ -254,75 +258,72 @@ class _TermGpaCalculatorPageState extends ConsumerState<TermGpaCalculatorPage> {
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(academicProfileProvider);
     final subjectsAsync = ref.watch(availableSubjectsProvider);
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    final scaleConfig = context.scaleConfig;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
+    final appBar = CustomAppBar(
+      useGradient: !isDarkMode,
+      title: 'term_gpa_calculator_title'.tr,
+    );
 
-    return Scaffold(
-      backgroundColor: lighterColor,
-      appBar: AppBar(
-        title: Text('term_gpa_calculator_title'.tr),
-        centerTitle: true,
-        backgroundColor: darkerColor,
-      ),
-      body: profileAsync.when(
-        loading:
-            () => const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
-        error:
-            (e, st) => Center(
-              child: Text(
-                'error_load_profile_data'.tr,
-                style: const TextStyle(color: AppColors.error),
-              ),
-            ),
+    final bodyContent = GlassLoadingOverlay(
+      isLoading: (profileAsync.isLoading && !profileAsync.hasValue) ||
+          (subjectsAsync.isLoading && !subjectsAsync.hasValue),
+      child: profileAsync.when(
         data: (profile) {
           if (_uniType == null && profile.universityType != null) {
             _uniType = profile.universityType;
           }
           return subjectsAsync.when(
-            loading:
-                () => const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-            error:
-                (e, st) => Center(
-                  child: Text(
-                    'error_load_subject_list'.tr,
-                    style: const TextStyle(color: AppColors.error),
-                  ),
-                ),
             data: (allSubjects) {
               return Column(
                 children: [
-                  _buildHeader(scaleConfig, profile),
+                  _buildHeader(context.scaleConfig, profile),
                   Expanded(
-                    child:
-                        _selectedSubjects.isEmpty
-                            ? _buildEmptyState()
-                            : _buildSubjectsList(profile),
+                    child: _selectedSubjects.isEmpty
+                        ? _buildEmptyState()
+                        : _buildSubjectsList(profile),
                   ),
                 ],
               );
             },
+            loading: () => const SizedBox.shrink(),
+            error: (e, st) => Center(
+                child: Text('error_load_subject_list'.tr,
+                    style: const TextStyle(color: AppColors.error))),
           );
         },
+        loading: () => const SizedBox.shrink(),
+        error: (e, st) => Center(
+            child: Text('error_load_profile_data'.tr,
+                style: const TextStyle(color: AppColors.error))),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed:
-            profileAsync.hasValue && subjectsAsync.hasValue
-                ? () => _showAddSubjectDialog(
-                  subjectsAsync.value!,
-                  profileAsync.value!,
-                )
-                : null,
-        backgroundColor: AppColors.primary,
-        tooltip: 'add_subject_tooltip'.tr,
-        child: Icon(Icons.add, color: primaryTextColor),
-      ),
+    );
+
+    if (isDarkMode) {
+      return GradientScaffold(
+        appBar: appBar,
+        body: bodyContent,
+        floatingActionButton: _buildFAB(profileAsync, subjectsAsync),
+      );
+    } else {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: appBar,
+        body: bodyContent,
+        floatingActionButton: _buildFAB(profileAsync, subjectsAsync),
+      );
+    }
+  }
+
+  Widget _buildFAB(AsyncValue<AcademicProfile> profileAsync,
+      AsyncValue<List<Map<String, dynamic>>> subjectsAsync) {
+    return CustomFAB(
+      onPressed: profileAsync.hasValue && subjectsAsync.hasValue
+          ? () =>
+              _showAddSubjectDialog(subjectsAsync.value!, profileAsync.value!)
+          : () {},
+      tooltip: 'add_subject_tooltip'.tr,
     );
   }
 
@@ -333,15 +334,8 @@ class _TermGpaCalculatorPageState extends ConsumerState<TermGpaCalculatorPage> {
       _projectedGpa = totalHours > 0 ? totalQualityPoints / totalHours : 0.0;
     }
 
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-
-    return Card(
+    return GlassCard(
       margin: const EdgeInsets.all(12),
-      color: darkerColor,
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -350,33 +344,25 @@ class _TermGpaCalculatorPageState extends ConsumerState<TermGpaCalculatorPage> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildHeaderItem(
-                  'term_gpa_label'.tr,
-                  _termGpa.toStringAsFixed(2),
-                  AppColors.primary,
-                  scaleConfig,
-                ),
-                _buildHeaderItem(
-                  'term_hours_label'.tr,
-                  "$_termHours / 21",
-                  AppColors.accent,
-                  scaleConfig,
-                ),
+                    'term_gpa_label'.tr,
+                    _termGpa.toStringAsFixed(2),
+                    AppColors.primary,
+                    scaleConfig),
+                _buildHeaderItem('term_hours_label'.tr, "$_termHours / 21",
+                    AppColors.accent, scaleConfig),
               ],
             ),
-            Divider(height: 24, color: lighterColor),
+            Divider(height: 24, color: Theme.of(context).dividerColor),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.auto_graph,
-                  color: AppColors.primary,
-                  size: 28,
-                ),
+                const Icon(Icons.auto_graph,
+                    color: AppColors.primary, size: 28),
                 const SizedBox(width: 12),
                 Text(
                   'projected_gpa_label'.tr,
                   style: TextStyle(
-                    color: secondaryTextColor,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
                     fontSize: scaleConfig.scaleText(14),
                   ),
                 ),
@@ -398,18 +384,13 @@ class _TermGpaCalculatorPageState extends ConsumerState<TermGpaCalculatorPage> {
   }
 
   Widget _buildHeaderItem(
-    String label,
-    String value,
-    Color color,
-    ScaleConfig scaleConfig,
-  ) {
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+      String label, String value, Color color, ScaleConfig scaleConfig) {
     return Column(
       children: [
         Text(
           label,
           style: TextStyle(
-            color: secondaryTextColor,
+            color: Theme.of(context).textTheme.bodyMedium?.color,
             fontSize: scaleConfig.scaleText(14),
           ),
         ),
@@ -427,16 +408,18 @@ class _TermGpaCalculatorPageState extends ConsumerState<TermGpaCalculatorPage> {
   }
 
   Widget _buildEmptyState() {
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.add_chart, size: 60, color: secondaryTextColor),
+          Icon(Icons.add_chart,
+              size: 60, color: Theme.of(context).textTheme.bodyMedium?.color),
           const SizedBox(height: 16),
           Text(
             'empty_term_gpa_prompt'.tr,
-            style: TextStyle(color: secondaryTextColor, fontSize: 13),
+            style: TextStyle(
+                color: Theme.of(context).textTheme.bodyMedium?.color,
+                fontSize: 13),
           ),
         ],
       ),
@@ -444,18 +427,13 @@ class _TermGpaCalculatorPageState extends ConsumerState<TermGpaCalculatorPage> {
   }
 
   Widget _buildSubjectsList(AcademicProfile profile) {
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
       itemCount: _selectedSubjects.length,
       itemBuilder: (context, index) {
         final entry = _selectedSubjects[index];
-        return Card(
+        return GlassCard(
           margin: const EdgeInsets.symmetric(vertical: 6),
-          color: darkerColor,
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
@@ -464,50 +442,34 @@ class _TermGpaCalculatorPageState extends ConsumerState<TermGpaCalculatorPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(entry.name,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyLarge
+                              ?.copyWith(fontWeight: FontWeight.bold)),
                       Text(
-                        entry.name,
-                        style: TextStyle(
-                          color: primaryTextColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        'hours_label'.trParams({
-                          'hours': entry.hours.toString(),
-                        }),
-                        style: TextStyle(
-                          color: secondaryTextColor,
-                          fontSize: 12,
-                        ),
-                      ),
+                          'hours_label'
+                              .trParams({'hours': entry.hours.toString()}),
+                          style: Theme.of(context).textTheme.bodyMedium),
                     ],
                   ),
                 ),
                 SizedBox(
                   width: 120,
-                  child: TextField(
+                  child: TextFormField(
+                    // Using TextFormField for consistency
                     controller: entry.markController,
                     textAlign: TextAlign.center,
                     keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    maxLength: 3,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(3)
+                    ],
                     style: const TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        color: AppColors.primary, fontWeight: FontWeight.bold),
                     decoration: InputDecoration(
                       labelText: 'mark_label'.tr,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        color: secondaryTextColor,
-                      ),
-                      counterText: "",
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 12,
-                      ),
-                    ),
+                    ).applyDefaults(Theme.of(context).inputDecorationTheme),
                     onChanged: (value) {
                       final newMark = int.tryParse(value) ?? 0;
                       if (newMark >= 0 && newMark <= 100) {
@@ -518,10 +480,8 @@ class _TermGpaCalculatorPageState extends ConsumerState<TermGpaCalculatorPage> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(
-                    Icons.remove_circle_outline,
-                    color: AppColors.error,
-                  ),
+                  icon: const Icon(Icons.remove_circle_outline,
+                      color: AppColors.error),
                   onPressed: () {
                     setState(() {
                       _selectedSubjects[index].dispose();

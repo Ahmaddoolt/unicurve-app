@@ -295,7 +295,7 @@ class AddSubjectRelationsPageState extends State<AddSubjectRelationsPage> {
           'code': widget.subject.code,
         }),
         centerTitle: true,
-        backgroundColor: darkerColor,
+        useGradient: true,
       ),
       body: Stack(
         children: [
@@ -657,7 +657,7 @@ class AddSubjectRelationsPageState extends State<AddSubjectRelationsPage> {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-        borderSide: const BorderSide(color: AppColors.primaryDark),
+        borderSide: const BorderSide(color: AppColors.darkBackground),
       ),
       prefixIcon: Icon(
         icon,

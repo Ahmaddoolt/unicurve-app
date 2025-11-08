@@ -1,6 +1,11 @@
+// lib/onboarding/widgets/language_selection_step.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get/get.dart';
+import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/glass_card.dart'; // --- FIX: Import GlassCard ---
+import 'package:unicurve/core/utils/gradient_icon.dart'; // --- FIX: Import GradientIcon ---
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/onboarding/providers/onboarding_provider.dart';
 
@@ -51,8 +56,7 @@ class _LanguageSelectionStepState extends ConsumerState<LanguageSelectionStep>
   @override
   Widget build(BuildContext context) {
     final scaleConfig = context.scaleConfig;
-    final textTheme = Theme.of(context).textTheme;
-    const primaryColor = Color(0xFF24C28F);
+    final theme = Theme.of(context);
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: scaleConfig.scale(24)),
@@ -65,16 +69,21 @@ class _LanguageSelectionStepState extends ConsumerState<LanguageSelectionStep>
               padding: EdgeInsets.all(scaleConfig.scale(20)),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF1A1A1A),
+                color: theme.cardColor.withOpacity(0.8),
                 border: Border.all(
-                  // ignore: deprecated_member_use
-                  color: primaryColor.withOpacity(0.5),
+                  color: AppColors.primary.withOpacity(0.3),
                   width: 2,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  )
+                ],
               ),
-              child: Icon(
-                Icons.language,
-                color: primaryColor,
+              child: GradientIcon(
+                icon: Icons.language,
                 size: scaleConfig.scale(40),
               ),
             ),
@@ -85,8 +94,7 @@ class _LanguageSelectionStepState extends ConsumerState<LanguageSelectionStep>
             child: Text(
               'onboarding_lang_title'.tr,
               textAlign: TextAlign.center,
-              style: textTheme.displaySmall?.copyWith(
-                color: Colors.white,
+              style: theme.textTheme.displaySmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 fontSize: scaleConfig.scaleText(34),
               ),
@@ -98,10 +106,8 @@ class _LanguageSelectionStepState extends ConsumerState<LanguageSelectionStep>
             child: Text(
               'onboarding_lang_subtitle'.tr,
               textAlign: TextAlign.center,
-              style: textTheme.titleMedium?.copyWith(
-                color: Colors.grey[400],
-                fontSize: scaleConfig.scaleText(16),
-              ),
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontSize: scaleConfig.scaleText(16)),
             ),
           ),
           SizedBox(height: scaleConfig.scale(48)),
@@ -109,10 +115,9 @@ class _LanguageSelectionStepState extends ConsumerState<LanguageSelectionStep>
             animation: _animations[3],
             child: _LanguageCard(
               language: 'onboarding_lang_english'.tr,
-              onTap:
-                  () => ref
-                      .read(onboardingProvider.notifier)
-                      .selectLanguage(const Locale('en', 'US')),
+              onTap: () => ref
+                  .read(onboardingProvider.notifier)
+                  .selectLanguage(const Locale('en', 'US')),
             ),
           ),
           SizedBox(height: scaleConfig.scale(20)),
@@ -120,10 +125,9 @@ class _LanguageSelectionStepState extends ConsumerState<LanguageSelectionStep>
             animation: _animations[4],
             child: _LanguageCard(
               language: 'onboarding_lang_arabic'.tr,
-              onTap:
-                  () => ref
-                      .read(onboardingProvider.notifier)
-                      .selectLanguage(const Locale('ar', 'SA')),
+              onTap: () => ref
+                  .read(onboardingProvider.notifier)
+                  .selectLanguage(const Locale('ar', 'SA')),
             ),
           ),
         ],
@@ -135,7 +139,6 @@ class _LanguageSelectionStepState extends ConsumerState<LanguageSelectionStep>
 class _AnimatedUIElement extends StatelessWidget {
   final Animation<double> animation;
   final Widget child;
-
   const _AnimatedUIElement({required this.animation, required this.child});
 
   @override
@@ -156,41 +159,40 @@ class _AnimatedUIElement extends StatelessWidget {
 class _LanguageCard extends StatelessWidget {
   final String language;
   final VoidCallback onTap;
-
   const _LanguageCard({required this.language, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final scaleConfig = context.scaleConfig;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: scaleConfig.scale(24),
-          vertical: scaleConfig.scale(20),
-        ),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(scaleConfig.scale(16)),
-          border: Border.all(color: Colors.grey[800]!, width: 1.5),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              language,
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: scaleConfig.scaleText(20),
-                fontWeight: FontWeight.w600,
+    final theme = Theme.of(context);
+
+    // --- THE KEY FIX IS HERE ---
+    return GlassCard(
+      borderRadius: BorderRadius.circular(scaleConfig.scale(16)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(scaleConfig.scale(16)),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: scaleConfig.scale(24),
+            vertical: scaleConfig.scale(20),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                language,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontSize: scaleConfig.scaleText(20),
+                ),
               ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: Colors.grey[600],
-              size: scaleConfig.scale(18),
-            ),
-          ],
+              Icon(
+                Icons.arrow_forward_ios,
+                color: theme.textTheme.bodyMedium?.color,
+                size: scaleConfig.scale(18),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -1,3 +1,5 @@
+// lib/pages/uni_admin/uni_admin_widgets/navigation_card.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
@@ -10,54 +12,37 @@ Widget buildNavigationCard(
   required IconData icon,
   required VoidCallback onTap,
 }) {
-  final cardWidth =
-      scaleConfig.isTablet
-          ? scaleConfig.widthPercentage(0.88)
-          : scaleConfig.widthPercentage(0.9);
-  final cardHeight =
-      scaleConfig.isTablet ? scaleConfig.scale(150) : scaleConfig.scale(162);
-
-  Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-  Color? lighterColor = Theme.of(context).cardColor;
-  Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-  Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+  final theme = Theme.of(context);
+  final isDarkMode = theme.brightness == Brightness.dark;
 
   return Card(
-    elevation: 5,
+    elevation: 6,
+    shadowColor: isDarkMode
+        ? Colors.black.withOpacity(0.5)
+        : AppColors.gradientBlueMid.withOpacity(0.4),
+    clipBehavior: Clip.antiAlias,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
+      borderRadius: BorderRadius.circular(scaleConfig.scale(16)),
     ),
-    margin: EdgeInsets.only(bottom: scaleConfig.scale(24)),
+    margin: EdgeInsets.only(bottom: scaleConfig.scale(20)),
     child: InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
+      borderRadius: BorderRadius.circular(scaleConfig.scale(16)),
       child: Container(
-        height: cardHeight,
-        width: cardWidth,
-        padding: EdgeInsets.all(scaleConfig.scale(12)),
+        height: scaleConfig.scale(140),
+        width: double.infinity,
+        padding: EdgeInsets.all(scaleConfig.scale(16)),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.primaryDark, width: 4),
-          gradient: LinearGradient(
-            colors: [
-              // ignore: deprecated_member_use
-              darkerColor.withOpacity(0.9),
-              lighterColor,
-              darkerColor,
-              lighterColor,
-              darkerColor,
-              lighterColor,
-              // ignore: deprecated_member_use
-              darkerColor.withOpacity(0.9),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
+          // UPDATED: This now selects the correct gradient based on the theme
+          gradient: isDarkMode
+              ? AppColors.primaryGradient
+              : AppColors.primaryGradient,
+          borderRadius: BorderRadius.circular(scaleConfig.scale(16)),
         ),
         child: Row(
           children: [
             Expanded(
-              flex: 2,
+              flex: 3,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -65,19 +50,26 @@ Widget buildNavigationCard(
                   Text(
                     title,
                     style: TextStyle(
-                      fontSize: scaleConfig.scaleText(14),
+                      fontSize: scaleConfig.scaleText(22),
                       fontWeight: FontWeight.bold,
-                      color: primaryTextColor,
+                      color: Colors.white, // Text on gradients is always white
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        )
+                      ],
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   SizedBox(height: scaleConfig.scale(8)),
                   Text(
                     'tap_to_manage_subtitle'.tr,
                     style: TextStyle(
-                      fontSize: scaleConfig.scaleText(12),
-                      color: secondaryTextColor,
+                      fontSize: scaleConfig.scaleText(14),
+                      color: Colors.white.withOpacity(0.9),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -85,12 +77,14 @@ Widget buildNavigationCard(
                 ],
               ),
             ),
-            Expanded(
-              flex: 1,
+            CircleAvatar(
+              radius: scaleConfig.scale(35),
+              // A slightly transparent black background looks great on both gradients
+              backgroundColor: Colors.black.withOpacity(0.15),
               child: Icon(
                 icon,
-                color: AppColors.primary,
-                size: scaleConfig.scale(40),
+                color: Colors.white,
+                size: scaleConfig.scale(30),
               ),
             ),
           ],

@@ -275,7 +275,7 @@ class ProfessorsController extends StateNotifier<List<Professor>> {
               fontSize: ScaleConfig(context).scaleText(14),
             ),
           ),
-          backgroundColor: isError ? AppColors.error : AppColors.primaryDark,
+          backgroundColor: isError ? AppColors.error : AppColors.darkBackground,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(ScaleConfig(context).scale(8)),

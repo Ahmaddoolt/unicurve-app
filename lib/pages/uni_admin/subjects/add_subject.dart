@@ -1,9 +1,16 @@
+// lib/pages/uni_admin/subjects/add_subject.dart
+
+import 'dart:ui'; // --- FIX: Import for ImageFilter ---
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unicurve/core/utils/colors.dart';
 import 'package:unicurve/core/utils/custom_appbar.dart';
+import 'package:unicurve/core/utils/custom_button.dart';
+import 'package:unicurve/core/utils/glass_card.dart';
+import 'package:unicurve/core/utils/glass_loading_overlay.dart'; // --- FIX: Import the new widget ---
+import 'package:unicurve/core/utils/gradient_scaffold.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/domain/models/subject.dart';
 import 'package:unicurve/pages/uni_admin/providers/admin_university_provider.dart';
@@ -62,7 +69,7 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
       _errorMessage = null;
     });
     try {
-      final adminUniversity = ref.read(adminUniversityProvider).value;
+      final adminUniversity = await ref.read(adminUniversityProvider.future);
       if (adminUniversity == null || adminUniversity['university_id'] == null) {
         throw Exception('University not found. Please go back and try again.');
       }
@@ -123,10 +130,6 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
       _showError('add_subject_error_fill_fields'.tr);
       return;
     }
-    if (_universityId == null) {
-      _showError('add_subject_error_no_university'.tr);
-      return;
-    }
 
     _formKey.currentState!.save();
     setState(() => _isSubmitting = true);
@@ -144,12 +147,11 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
         type: _selectedRequirementId,
       );
 
-      final response =
-          await supabase
-              .from('subjects')
-              .insert(subject.toMap())
-              .select()
-              .single();
+      final response = await supabase
+          .from('subjects')
+          .insert(subject.toMap())
+          .select()
+          .single();
 
       if (mounted) {
         final newSubject = Subject.fromMap(response);
@@ -157,16 +159,17 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
         final bool? success = await Navigator.push<bool>(
           context,
           MaterialPageRoute(
-            builder:
-                (context) => AddSubjectRelationsPage(
-                  subject: newSubject,
-                  universityId: _universityId!,
-                ),
+            builder: (context) => AddSubjectRelationsPage(
+              subject: newSubject,
+              universityId: _universityId!,
+            ),
           ),
         );
 
         if (success == true && mounted) {
           Navigator.of(context).pop(true);
+        } else if (success == false && mounted) {
+          Navigator.of(context).pop(false);
         }
       }
     } catch (e) {
@@ -189,94 +192,120 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
   @override
   Widget build(BuildContext context) {
     final scaleConfig = context.scaleConfig;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: lighterColor,
-      appBar: CustomAppBar(
-        title: 'add_subject_page_title'.tr,
-        centerTitle: true,
-        backgroundColor: darkerColor,
-      ),
-      body:
-          _isLoadingMajors
-              ? _buildLoadingIndicator('add_subject_loading_majors'.tr)
-              : SingleChildScrollView(
-                padding: EdgeInsets.all(scaleConfig.scale(16)),
-                child: Card(
-                  color: darkerColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(scaleConfig.scale(16)),
-                    side: const BorderSide(
-                      color: AppColors.primary,
-                      width: 1.5,
-                    ),
+    final appBar = CustomAppBar(
+      title: 'add_subject_page_title'.tr,
+      centerTitle: true,
+      useGradient: !isDarkMode,
+    );
+
+    final bodyContent = GlassLoadingOverlay(
+      isLoading: _isLoadingMajors,
+      child: SingleChildScrollView(
+        // The content is visible but non-interactive when loading
+        physics: _isLoadingMajors ? const NeverScrollableScrollPhysics() : null,
+        padding: EdgeInsets.all(scaleConfig.scale(16)),
+        child: GlassCard(
+          child: Padding(
+            padding: EdgeInsets.all(scaleConfig.scale(16)),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader(
+                    'add_subject_section_details'.tr,
+                    scaleConfig,
                   ),
-                  elevation: 4,
-                  child: Padding(
-                    padding: EdgeInsets.all(scaleConfig.scale(16)),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildSectionHeader(
-                            'add_subject_section_details'.tr,
-                            scaleConfig,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildTextField(
-                            controller: _codeController,
-                            label: 'add_subject_code_label'.tr,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildTextField(
-                            controller: _nameController,
-                            label: 'add_subject_name_label'.tr,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildMajorDropdown(),
-                          const SizedBox(height: 16),
-                          if (_majorId != null) _buildRequirementTypeDropdown(),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(child: _buildHoursDropdown()),
-                              const SizedBox(width: 16),
-                              Expanded(child: _buildLevelDropdown()),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          _buildTextField(
-                            controller: _descriptionController,
-                            label: 'add_subject_desc_label'.tr,
-                            maxLines: 3,
-                            isRequired: false,
-                          ),
-                          const SizedBox(height: 8),
-                          _buildIsOpenSwitch(),
-                          if (_errorMessage != null) _buildErrorMessageWidget(),
-                          const SizedBox(height: 24),
-                          _buildSubmitButton(),
-                        ],
-                      ),
-                    ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _codeController,
+                    label: 'add_subject_code_label'.tr,
                   ),
-                ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _nameController,
+                    label: 'add_subject_name_label'.tr,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildMajorDropdown(),
+                  const SizedBox(height: 16),
+                  if (_majorId != null) _buildRequirementTypeDropdown(),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(child: _buildHoursDropdown()),
+                      const SizedBox(width: 16),
+                      Expanded(child: _buildLevelDropdown()),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _descriptionController,
+                    label: 'add_subject_desc_label'.tr,
+                    maxLines: 3,
+                    isRequired: false,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildIsOpenSwitch(),
+                  if (_errorMessage != null) _buildErrorMessageWidget(),
+                  const SizedBox(height: 24),
+                  _buildSubmitButton(),
+                ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (isDarkMode) {
+      return GradientScaffold(appBar: appBar, body: bodyContent);
+    } else {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: appBar,
+        body: bodyContent,
+      );
+    }
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    return InputDecoration(
+      labelText: label,
+      labelStyle: theme.textTheme.labelLarge,
+      filled: true,
+      fillColor: isDarkMode
+          ? Colors.black.withOpacity(0.25)
+          : theme.inputDecorationTheme.fillColor,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: isDarkMode
+            ? BorderSide(color: Colors.white.withOpacity(0.2))
+            : BorderSide(color: Colors.grey.shade300),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10.0),
+        borderSide: const BorderSide(color: AppColors.accent, width: 2),
+      ),
     );
   }
 
   Widget _buildSectionHeader(String title, ScaleConfig scaleConfig) {
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
     return Text(
       title,
-      style: TextStyle(
-        color: primaryTextColor,
-        fontSize: scaleConfig.scaleText(18),
-        fontWeight: FontWeight.bold,
-      ),
+      style: Theme.of(context)
+          .textTheme
+          .titleLarge
+          ?.copyWith(fontSize: scaleConfig.scaleText(18)),
     );
   }
 
@@ -286,222 +315,146 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
     int maxLines = 1,
     bool isRequired = true,
   }) {
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
     return TextFormField(
       controller: controller,
-      style: TextStyle(color: primaryTextColor),
+      style: Theme.of(context).textTheme.bodyLarge,
       decoration: _inputDecoration(label),
       maxLines: maxLines,
-      validator:
-          isRequired
-              ? (value) =>
-                  value!.trim().isEmpty ? 'error_field_required'.tr : null
-              : null,
+      validator: isRequired
+          ? (value) => value!.trim().isEmpty ? 'error_field_required'.tr : null
+          : null,
       enabled: !_isSubmitting,
     );
   }
 
   Widget _buildMajorDropdown() {
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     return DropdownButtonFormField<int>(
       value: _majorId,
       decoration: _inputDecoration('add_subject_major_label'.tr),
-      items:
-          _majors.map((major) {
-            return DropdownMenuItem<int>(
-              value: major['id'] as int,
-              child: Text(
-                major['name'],
-                style: TextStyle(color: primaryTextColor),
-              ),
-            );
-          }).toList(),
-      onChanged:
-          _isSubmitting
-              ? null
-              : (value) {
-                if (value != null && value != _majorId) {
-                  setState(() => _majorId = value);
-                  _fetchRequirementsForMajor(value);
-                }
-              },
-      validator:
-          (value) => value == null ? 'add_subject_error_select_major'.tr : null,
-      dropdownColor: darkerColor,
+      style: theme.textTheme.bodyLarge,
+      dropdownColor: isDarkMode ? const Color(0xFF2D3748) : theme.cardColor,
+      icon: Icon(Icons.keyboard_arrow_down,
+          color: theme.textTheme.bodyMedium?.color),
+      items: _majors.map((major) {
+        return DropdownMenuItem<int>(
+          value: major['id'] as int,
+          child: Text(major['name']),
+        );
+      }).toList(),
+      onChanged: _isSubmitting
+          ? null
+          : (value) {
+              if (value != null && value != _majorId) {
+                setState(() => _majorId = value);
+                _fetchRequirementsForMajor(value);
+              }
+            },
+      validator: (value) =>
+          value == null ? 'add_subject_error_select_major'.tr : null,
     );
   }
 
   Widget _buildRequirementTypeDropdown() {
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     if (_isLoadingRequirements) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 8.0),
-        child: Center(
-          child: CircularProgressIndicator(color: AppColors.primary),
-        ),
+        child:
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
       );
     }
     return DropdownButtonFormField<int>(
       value: _selectedRequirementId,
       decoration: _inputDecoration('add_subject_req_type_label'.tr),
-      hint:
-          _majorRequirements.isEmpty
-              ? Text(
-                'add_subject_no_reqs'.tr,
-                style: TextStyle(color: secondaryTextColor),
-              )
-              : null,
-      items:
-          _majorRequirements.map((req) {
-            return DropdownMenuItem<int>(
-              value: req['id'] as int,
-              child: Text(
-                req['requirement_name'],
-                style: TextStyle(color: primaryTextColor),
-              ),
-            );
-          }).toList(),
-      onChanged:
-          _isSubmitting || _majorRequirements.isEmpty
-              ? null
-              : (value) => setState(() => _selectedRequirementId = value),
-      validator:
-          (value) => value == null ? 'add_subject_error_select_req'.tr : null,
-      dropdownColor: darkerColor,
+      hint: _majorRequirements.isEmpty
+          ? Text('add_subject_no_reqs'.tr, style: theme.textTheme.labelLarge)
+          : null,
+      style: theme.textTheme.bodyLarge,
+      dropdownColor: isDarkMode ? const Color(0xFF2D3748) : theme.cardColor,
+      icon: Icon(Icons.keyboard_arrow_down,
+          color: theme.textTheme.bodyMedium?.color),
+      items: _majorRequirements.map((req) {
+        return DropdownMenuItem<int>(
+          value: req['id'] as int,
+          child: Text(req['requirement_name']),
+        );
+      }).toList(),
+      onChanged: _isSubmitting || _majorRequirements.isEmpty
+          ? null
+          : (value) => setState(() => _selectedRequirementId = value),
+      validator: (value) =>
+          value == null ? 'add_subject_error_select_req'.tr : null,
     );
   }
 
   Widget _buildHoursDropdown() {
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     return DropdownButtonFormField<int>(
       value: _hours,
       decoration: _inputDecoration('add_subject_hours_label'.tr),
-      items:
-          List.generate(6, (i) => i + 1).map((h) {
-            return DropdownMenuItem<int>(
-              value: h,
-              child: Text(
-                'add_subject_hours_unit'.trParams({'count': '$h'}),
-                style: TextStyle(color: primaryTextColor),
-              ),
-            );
-          }).toList(),
+      style: theme.textTheme.bodyLarge,
+      dropdownColor: isDarkMode ? const Color(0xFF2D3748) : theme.cardColor,
+      icon: Icon(Icons.keyboard_arrow_down,
+          color: theme.textTheme.bodyMedium?.color),
+      items: List.generate(6, (i) => i + 1).map((h) {
+        return DropdownMenuItem<int>(
+          value: h,
+          child: Text('add_subject_hours_unit'.trParams({'count': '$h'})),
+        );
+      }).toList(),
       onChanged: _isSubmitting ? null : (v) => setState(() => _hours = v!),
       validator: (v) => v == null ? 'error_field_required'.tr : null,
-      dropdownColor: darkerColor,
     );
   }
 
   Widget _buildLevelDropdown() {
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
     return DropdownButtonFormField<int>(
       value: _level,
       decoration: _inputDecoration('add_subject_level_label'.tr),
-      items:
-          List.generate(5, (i) => i + 1).map((l) {
-            return DropdownMenuItem<int>(
-              value: l,
-              child: Text(
-                'add_subject_level_unit'.trParams({'level': '$l'}),
-                style: TextStyle(color: primaryTextColor),
-              ),
-            );
-          }).toList(),
+      style: theme.textTheme.bodyLarge,
+      dropdownColor: isDarkMode ? const Color(0xFF2D3748) : theme.cardColor,
+      icon: Icon(Icons.keyboard_arrow_down,
+          color: theme.textTheme.bodyMedium?.color),
+      items: List.generate(5, (i) => i + 1).map((l) {
+        return DropdownMenuItem<int>(
+          value: l,
+          child: Text('add_subject_level_unit'.trParams({'level': '$l'})),
+        );
+      }).toList(),
       onChanged: _isSubmitting ? null : (v) => setState(() => _level = v!),
       validator: (v) => v == null ? 'error_field_required'.tr : null,
-      dropdownColor: darkerColor,
     );
   }
 
   Widget _buildIsOpenSwitch() {
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
     return SwitchListTile(
-      title: Text(
-        'add_subject_is_open_label'.tr,
-        style: TextStyle(color: primaryTextColor),
-      ),
+      title: Text('add_subject_is_open_label'.tr,
+          style: theme.textTheme.bodyLarge),
       value: _isOpen,
       onChanged: _isSubmitting ? null : (v) => setState(() => _isOpen = v),
       activeColor: AppColors.primary,
-      inactiveThumbColor: secondaryTextColor,
-      contentPadding: EdgeInsets.zero,
-      tileColor: lighterColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      inactiveThumbColor: theme.textTheme.bodyMedium?.color,
+      tileColor: theme.colorScheme.surface.withOpacity(0.5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     );
   }
 
   Widget _buildSubmitButton() {
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
-        onPressed: _isSubmitting ? null : _submitForm,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child:
-            _isSubmitting
-                ? SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    color: primaryTextColor,
-                    strokeWidth: 2,
-                  ),
-                )
-                : Text(
-                  'add_subject_continue_button'.tr,
-                  style: TextStyle(
-                    color: primaryTextColor,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                  ),
-                ),
-      ),
-    );
-  }
-
-  Widget _buildLoadingIndicator(String text) {
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(color: AppColors.primary),
-          const SizedBox(height: 16),
-          Text(text, style: TextStyle(color: secondaryTextColor)),
-        ],
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(String label) {
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-    return InputDecoration(
-      labelText: label,
-      labelStyle: TextStyle(color: secondaryTextColor),
-      filled: true,
-      fillColor: lighterColor,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primaryDark),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primaryDark),
+      child: CustomButton(
+        onPressed: _isSubmitting ? () {} : () => _submitForm(),
+        text: 'add_subject_continue_button'.tr,
+        gradient: _isSubmitting
+            ? AppColors.disabledGradient
+            : AppColors.primaryGradient,
       ),
     );
   }
@@ -512,8 +465,7 @@ class AddSubjectBasicPageState extends ConsumerState<AddSubjectBasicPage> {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          // ignore: deprecated_member_use
-          color: AppColors.error.withOpacity(0.2),
+          color: AppColors.error.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.error),
         ),

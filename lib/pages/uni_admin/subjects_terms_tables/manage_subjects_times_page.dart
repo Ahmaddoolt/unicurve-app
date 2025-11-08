@@ -1,174 +1,66 @@
+// lib/pages/uni_admin/subjects_terms_tables/manage_subjects_times_page.dart
+
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get/get.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_appbar.dart';
+import 'package:unicurve/core/utils/custom_button.dart';
 import 'package:unicurve/core/utils/custom_snackbar.dart';
+import 'package:unicurve/core/utils/glass_card.dart';
+import 'package:unicurve/core/utils/glass_loading_overlay.dart'; // --- FIX: Import the overlay ---
+import 'package:unicurve/core/utils/gradient_scaffold.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/domain/models/subject.dart';
-import 'package:unicurve/pages/uni_admin/providers/admin_university_provider.dart';
-import 'package:unicurve/pages/uni_admin/providers/majors_provider.dart';
 import 'package:unicurve/pages/uni_admin/providers/selected_major_provider.dart';
 import 'subjects_repository.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 final majorRequirementsMapProvider = FutureProvider.autoDispose
     .family<Map<int, String>, int>((ref, majorId) async {
-      final response = await Supabase.instance.client
-          .from('major_requirements')
-          .select('id, requirement_name')
-          .eq('major_id', majorId);
+  final response = await Supabase.instance.client
+      .from('major_requirements')
+      .select('id, requirement_name')
+      .eq('major_id', majorId);
 
-      final Map<int, String> requirementsMap = {
-        for (var req in response)
-          (req['id'] as int): req['requirement_name'] as String,
-      };
-      return requirementsMap;
-    });
+  final Map<int, String> requirementsMap = {
+    for (var req in response)
+      (req['id'] as int): req['requirement_name'] as String,
+  };
+  return requirementsMap;
+});
 
 class ManageSubjectsPage extends ConsumerWidget {
   const ManageSubjectsPage({super.key});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedMajorId = ref.watch(selectedMajorIdProvider);
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: lighterColor,
-      appBar: AppBar(
-        backgroundColor: darkerColor,
-        centerTitle: true,
-        title: Text(
-          selectedMajorId == null
-              ? 'manage_subjects_select_major_title'.tr
-              : 'manage_subjects_title'.tr,
-          style: TextStyle(
-            color: primaryTextColor,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        actions: [
-          if (selectedMajorId != null)
-            IconButton(
-              icon: const Icon(Icons.sync_alt, color: AppColors.accent),
-              tooltip: 'manage_subjects_change_major_tooltip'.tr,
-              onPressed:
-                  () => ref.read(selectedMajorIdProvider.notifier).state = null,
-            ),
-        ],
-      ),
-      body:
-          selectedMajorId == null
-              ? const _MajorSelectorView()
-              : _SubjectsListView(majorId: selectedMajorId),
+    final appBar = CustomAppBar(
+      useGradient: !isDarkMode,
+      title: 'manage_subjects_title'.tr,
     );
-  }
-}
 
-class _MajorSelectorView extends ConsumerWidget {
-  const _MajorSelectorView();
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scaleConfig = ScaleConfig(context);
-    final adminUniversityAsync = ref.watch(adminUniversityProvider);
+    final bodyContent = selectedMajorId == null
+        ? Center(child: Text('error_no_major_selected'.tr))
+        : _SubjectsListView(majorId: selectedMajorId);
 
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-
-    return adminUniversityAsync.when(
-      data: (adminUniversity) {
-        if (adminUniversity == null) {
-          return Center(child: Text('error_admin_uni_not_found'.tr));
-        }
-        final universityId = adminUniversity['university_id'] as int;
-        final majorsAsync = ref.watch(majorsProvider(universityId));
-        return majorsAsync.when(
-          data: (majors) {
-            if (majors.isEmpty) {
-              return Center(child: Text('error_no_majors_found'.tr));
-            }
-            return RefreshIndicator(
-              onRefresh: () => ref.refresh(majorsProvider(universityId).future),
-              child: ListView.builder(
-                padding: EdgeInsets.all(scaleConfig.scale(16)),
-                itemCount: majors.length,
-                itemBuilder: (context, index) {
-                  final major = majors[index];
-                  return Card(
-                    elevation: 2,
-                    color: darkerColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                      side: const BorderSide(
-                        color: AppColors.primary,
-                        width: 1.5,
-                      ),
-                    ),
-                    margin: EdgeInsets.symmetric(
-                      vertical: scaleConfig.scale(6),
-                    ),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: scaleConfig.scale(16),
-                        vertical: scaleConfig.scale(12),
-                      ),
-                      leading: CircleAvatar(
-                        backgroundColor: lighterColor,
-                        child: const Icon(
-                          Icons.school,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      title: Text(
-                        major.name,
-                        style: TextStyle(
-                          color: primaryTextColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      trailing: const Icon(
-                        Icons.arrow_forward_ios,
-                        color: AppColors.accent,
-                      ),
-                      onTap:
-                          () =>
-                              ref.read(selectedMajorIdProvider.notifier).state =
-                                  major.id,
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-          loading:
-              () => const Center(
-                child: CircularProgressIndicator(color: AppColors.primary),
-              ),
-          error:
-              (e, _) => Center(
-                child: Text(
-                  'error_loading_majors_generic'.trParams({
-                    'error': e.toString(),
-                  }),
-                ),
-              ),
-        );
-      },
-      loading:
-          () => const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          ),
-      error:
-          (e, _) => Center(
-            child: Text(
-              'error_loading_uni_info_generic'.trParams({
-                'error': e.toString(),
-              }),
-            ),
-          ),
-    );
+    if (isDarkMode) {
+      return GradientScaffold(
+        appBar: appBar,
+        body: bodyContent,
+      );
+    } else {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: appBar,
+        body: bodyContent,
+      );
+    }
   }
 }
 
@@ -200,114 +92,105 @@ class _SubjectsListViewState extends ConsumerState<_SubjectsListView> {
   Widget build(BuildContext context) {
     final scaleConfig = ScaleConfig(context);
     final subjectsAsync = ref.watch(subjectsProvider(widget.majorId));
-    final requirementsMapAsync = ref.watch(
-      majorRequirementsMapProvider(widget.majorId),
-    );
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final requirementsMapAsync =
+        ref.watch(majorRequirementsMapProvider(widget.majorId));
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.all(scaleConfig.scale(12)),
-          child: TextField(
-            controller: _searchController,
-            style: TextStyle(color: primaryTextColor),
-            decoration: InputDecoration(
-              hintText: 'manage_subjects_search_hint'.tr,
-              hintStyle: TextStyle(color: secondaryTextColor),
-              prefixIcon: Icon(Icons.search, color: secondaryTextColor),
-              filled: true,
-              fillColor: darkerColor,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-                borderSide: BorderSide.none,
-              ),
-              suffixIcon:
-                  _searchQuery.isNotEmpty
-                      ? IconButton(
-                        icon: Icon(Icons.clear, color: secondaryTextColor),
-                        onPressed: () => _searchController.clear(),
-                      )
-                      : null,
-            ),
+    // Safely get data or default to empty
+    final requirementsMap = requirementsMapAsync.valueOrNull ?? {};
+    final subjects = subjectsAsync.valueOrNull ?? [];
+
+    final filteredSubjects = subjects.where((s) {
+      final typeName = requirementsMap[s.type] ?? '';
+      final query = _searchQuery.toLowerCase();
+      return s.name.toLowerCase().contains(query) ||
+          s.code.toLowerCase().contains(query) ||
+          typeName.toLowerCase().contains(query);
+    }).toList();
+
+    return GlassLoadingOverlay(
+      isLoading: (subjectsAsync.isLoading && !subjectsAsync.hasValue) ||
+          (requirementsMapAsync.isLoading && !requirementsMapAsync.hasValue),
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(scaleConfig.scale(12),
+                scaleConfig.scale(12), scaleConfig.scale(12), 0),
+            child: isDarkMode
+                ? GlassCard(
+                    borderRadius: BorderRadius.circular(12),
+                    child: _buildSearchField(theme),
+                  )
+                : _buildSearchField(theme),
           ),
-        ),
-        Expanded(
-          child: requirementsMapAsync.when(
-            loading:
-                () => const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-            error:
-                (e, _) => Center(
-                  child: Text(
-                    'error_loading_requirements_generic'.trParams({
-                      'error': e.toString(),
-                    }),
-                  ),
-                ),
-            data: (requirementsMap) {
-              return subjectsAsync.when(
-                data: (subjects) {
-                  final filteredSubjects =
-                      subjects.where((s) {
-                        final typeName = requirementsMap[s.type] ?? '';
-                        final query = _searchQuery.toLowerCase();
-                        return s.name.toLowerCase().contains(query) ||
-                            s.code.toLowerCase().contains(query) ||
-                            typeName.toLowerCase().contains(query);
-                      }).toList();
-
-                  if (filteredSubjects.isEmpty) {
-                    return Center(
-                      child: Text(
-                        _searchQuery.isNotEmpty
-                            ? 'manage_subjects_no_match_search'.tr
-                            : 'manage_subjects_no_subjects_found'.tr,
-                        style: TextStyle(color: secondaryTextColor),
-                      ),
-                    );
-                  }
-
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      ref.invalidate(subjectsProvider(widget.majorId));
-                      ref.invalidate(
-                        majorRequirementsMapProvider(widget.majorId),
-                      );
-                    },
-                    child: ListView.builder(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: scaleConfig.scale(8),
-                      ),
-                      itemCount: filteredSubjects.length,
-                      itemBuilder:
-                          (context, index) => _SubjectCard(
+          Expanded(
+            child: (subjectsAsync.hasError || requirementsMapAsync.hasError)
+                ? Center(
+                    child: Text('error_generic'.trParams({
+                    'error': (subjectsAsync.error ?? requirementsMapAsync.error)
+                        .toString()
+                  })))
+                : (filteredSubjects.isEmpty && subjects.isNotEmpty)
+                    ? Center(
+                        child: Text(
+                          _searchQuery.isNotEmpty
+                              ? 'manage_subjects_no_match_search'.tr
+                              : 'manage_subjects_no_subjects_found'.tr,
+                          style: TextStyle(
+                              color: theme.textTheme.bodyMedium?.color),
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () async {
+                          ref.invalidate(subjectsProvider(widget.majorId));
+                          ref.invalidate(
+                              majorRequirementsMapProvider(widget.majorId));
+                        },
+                        child: ListView.builder(
+                          padding: EdgeInsets.all(scaleConfig.scale(8)),
+                          itemCount: filteredSubjects.length,
+                          itemBuilder: (context, index) => _SubjectCard(
                             subject: filteredSubjects[index],
                             requirementsMap: requirementsMap,
                           ),
-                    ),
-                  );
-                },
-                loading:
-                    () => const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
+                        ),
                       ),
-                    ),
-                error:
-                    (e, _) => Center(
-                      child: Text(
-                        'error_generic'.trParams({'error': e.toString()}),
-                      ),
-                    ),
-              );
-            },
           ),
-        ),
-      ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchField(ThemeData theme) {
+    return TextField(
+      controller: _searchController,
+      style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+      decoration: InputDecoration(
+        hintText: 'manage_subjects_search_hint'.tr,
+        fillColor: theme.brightness == Brightness.dark
+            ? Colors.transparent
+            : theme.inputDecorationTheme.fillColor,
+        border: theme.brightness == Brightness.dark
+            ? InputBorder.none
+            : theme.inputDecorationTheme.border,
+        enabledBorder: theme.brightness == Brightness.dark
+            ? InputBorder.none
+            : theme.inputDecorationTheme.enabledBorder,
+        focusedBorder: theme.brightness == Brightness.dark
+            ? InputBorder.none
+            : theme.inputDecorationTheme.focusedBorder,
+      ).applyDefaults(theme.inputDecorationTheme).copyWith(
+            prefixIcon:
+                Icon(Icons.search, color: theme.textTheme.bodyMedium?.color),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: Icon(Icons.clear,
+                        color: theme.textTheme.bodyMedium?.color),
+                    onPressed: () => _searchController.clear(),
+                  )
+                : null,
+          ),
     );
   }
 }
@@ -329,18 +212,10 @@ class _SubjectCardState extends ConsumerState<_SubjectCard> {
     final groupsAsync = ref.watch(subjectGroupsProvider(widget.subject.id!));
     final String typeName =
         widget.requirementsMap[widget.subject.type] ?? 'uncategorized_label'.tr;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
 
-    return Card(
+    return GlassCard(
       margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      color: darkerColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
-      ),
-      elevation: 2,
       child: Padding(
         padding: EdgeInsets.all(scaleConfig.scale(16)),
         child: Column(
@@ -357,7 +232,7 @@ class _SubjectCardState extends ConsumerState<_SubjectCard> {
                         widget.subject.name,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: primaryTextColor,
+                          color: theme.textTheme.bodyLarge?.color,
                           fontSize: scaleConfig.scale(16),
                         ),
                       ),
@@ -365,7 +240,7 @@ class _SubjectCardState extends ConsumerState<_SubjectCard> {
                       Text(
                         widget.subject.code,
                         style: TextStyle(
-                          color: secondaryTextColor,
+                          color: theme.textTheme.bodyMedium?.color,
                           fontSize: scaleConfig.scale(12),
                         ),
                       ),
@@ -374,18 +249,10 @@ class _SubjectCardState extends ConsumerState<_SubjectCard> {
                 ),
                 if (_isStatusLoading)
                   const SizedBox(
-                    height: 30,
-                    width: 30,
-                    child: Center(
-                      child: SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.5, color: AppColors.primary),
                   )
                 else
                   Switch(
@@ -413,34 +280,28 @@ class _SubjectCardState extends ConsumerState<_SubjectCard> {
               runSpacing: scaleConfig.scale(4),
               children: [
                 Chip(
-                  label: Text(
-                    'chip_level'.trParams({
-                      'level': widget.subject.level.toString(),
-                    }),
-                  ),
-                  // ignore: deprecated_member_use
+                  label: Text('chip_level'
+                      .trParams({'level': widget.subject.level.toString()})),
                   backgroundColor: AppColors.primary.withOpacity(0.2),
-                  labelStyle: const TextStyle(color: AppColors.primary),
+                  labelStyle: const TextStyle(
+                      color: AppColors.primary, fontWeight: FontWeight.bold),
                 ),
                 Chip(
-                  label: Text(
-                    'chip_hours'.trParams({
-                      'hours': widget.subject.hours.toString(),
-                    }),
-                  ),
-                  // ignore: deprecated_member_use
+                  label: Text('chip_hours'
+                      .trParams({'hours': widget.subject.hours.toString()})),
                   backgroundColor: AppColors.accent.withOpacity(0.2),
-                  labelStyle: const TextStyle(color: AppColors.accent),
+                  labelStyle: const TextStyle(
+                      color: AppColors.accent, fontWeight: FontWeight.bold),
                 ),
                 Chip(
                   label: Text(typeName),
-                  // ignore: deprecated_member_use
                   backgroundColor: Colors.teal.withOpacity(0.2),
-                  labelStyle: const TextStyle(color: Colors.teal),
+                  labelStyle: const TextStyle(
+                      color: Colors.teal, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
-            Divider(height: 32, color: lighterColor),
+            Divider(height: 32, color: theme.dividerColor.withOpacity(0.5)),
             Opacity(
               opacity: widget.subject.isOpen ? 1.0 : 0.5,
               child: Column(
@@ -451,69 +312,51 @@ class _SubjectCardState extends ConsumerState<_SubjectCard> {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: scaleConfig.scale(14),
-                      color: primaryTextColor,
+                      color: theme.textTheme.bodyLarge?.color,
                     ),
                   ),
                   SizedBox(height: scaleConfig.scale(12)),
                   groupsAsync.when(
-                    data:
-                        (groups) => Column(
-                          children: [
-                            if (groups.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16.0,
-                                ),
-                                child: Text(
-                                  'groups_none_available'.tr,
-                                  style: TextStyle(color: secondaryTextColor),
-                                ),
-                              ),
-                            ...groups.map((group) => _GroupItem(group: group)),
-                            SizedBox(height: scaleConfig.scale(12)),
-                            if (widget.subject.isOpen)
-                              Align(
-                                alignment: Alignment.center,
-                                child: TextButton.icon(
-                                  onPressed:
-                                      () => showDialog(
-                                        context: context,
-                                        builder:
-                                            (_) => _AddScheduleDialog(
-                                              subjectId: widget.subject.id!,
-                                            ),
-                                      ),
-                                  icon: const Icon(
-                                    Icons.add_circle_outline,
-                                    color: AppColors.primary,
-                                  ),
-                                  label: Text(
-                                    'groups_add_button'.tr,
-                                    style: const TextStyle(
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                    loading:
-                        () => const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.primary,
+                    data: (groups) => Column(
+                      children: [
+                        if (groups.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16.0),
+                            child: Text('groups_none_available'.tr,
+                                style: TextStyle(
+                                    color: theme.textTheme.bodyMedium?.color)),
+                          ),
+                        ...groups.map((group) => _GroupItem(group: group)),
+                        SizedBox(height: scaleConfig.scale(12)),
+                        if (widget.subject.isOpen)
+                          Align(
+                            alignment: Alignment.center,
+                            child: TextButton.icon(
+                              onPressed: () => showDialog(
+                                  context: context,
+                                  builder: (_) => _AddScheduleDialog(
+                                      subjectId: widget.subject.id!)),
+                              icon: const Icon(Icons.add_circle_outline,
+                                  color: AppColors.primary),
+                              label: Text('groups_add_button'.tr,
+                                  style: const TextStyle(
+                                      color: AppColors.primary)),
                             ),
                           ),
-                        ),
-                    error:
-                        (e, _) => Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Text(
-                            'error_generic'.trParams({'error': e.toString()}),
-                            style: const TextStyle(color: AppColors.error),
-                          ),
-                        ),
+                      ],
+                    ),
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Center(
+                          child: CircularProgressIndicator(
+                              color: AppColors.primary)),
+                    ),
+                    error: (e, _) => Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text(
+                          'error_generic'.trParams({'error': e.toString()}),
+                          style: const TextStyle(color: AppColors.error)),
+                    ),
                   ),
                 ],
               ),
@@ -538,73 +381,69 @@ class _GroupItem extends ConsumerWidget {
     final practical = group.schedules.where(
       (s) => s.scheduleType == 'PRACTICAL',
     );
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final theme = Theme.of(context);
+    Color? primaryTextColor = theme.textTheme.bodyLarge?.color;
 
-    return Container(
-      padding: EdgeInsets.all(scaleConfig.scale(12)),
+    return GlassCard(
       margin: EdgeInsets.only(bottom: scaleConfig.scale(8)),
-      decoration: BoxDecoration(
-        // ignore: deprecated_member_use
-        color: lighterColor.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+      borderRadius: BorderRadius.circular(scaleConfig.scale(8)),
+      child: Padding(
+        padding: EdgeInsets.all(scaleConfig.scale(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'group_code_label'.trParams({'code': group.groupCode}),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: primaryTextColor,
+                    fontSize: scaleConfig.scale(14),
+                  ),
+                ),
+                IconButton(
+                  iconSize: 20,
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  icon: const Icon(Icons.delete_sweep, color: AppColors.error),
+                  onPressed: () => showDialog(
+                    context: context,
+                    builder: (_) =>
+                        _DeleteGroupConfirmationDialog(group: group),
+                  ),
+                ),
+              ],
+            ),
+            Divider(color: theme.dividerColor.withOpacity(0.5), height: 16),
+            if (theoretical.isNotEmpty) ...[
               Text(
-                'group_code_label'.trParams({'code': group.groupCode}),
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: primaryTextColor,
-                  fontSize: scaleConfig.scale(14),
+                'group_theoretical_label'.tr,
+                style: const TextStyle(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              IconButton(
-                iconSize: 20,
-                constraints: const BoxConstraints(),
-                padding: const EdgeInsets.all(4),
-                icon: const Icon(Icons.delete_sweep, color: AppColors.error),
-                onPressed:
-                    () => showDialog(
-                      context: context,
-                      builder:
-                          (_) => _DeleteGroupConfirmationDialog(group: group),
-                    ),
+              ...theoretical.map(
+                (s) => ScheduleRow(schedule: s, subjectId: group.subjectId),
               ),
             ],
-          ),
-          Divider(color: darkerColor, height: 16),
-          if (theoretical.isNotEmpty) ...[
-            Text(
-              'group_theoretical_label'.tr,
-              style: const TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.w500,
+            if (practical.isNotEmpty) ...[
+              SizedBox(height: theoretical.isNotEmpty ? 8 : 0),
+              Text(
+                'group_practical_label'.tr,
+                style: const TextStyle(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-            ...theoretical.map(
-              (s) => ScheduleRow(schedule: s, subjectId: group.subjectId),
-            ),
-          ],
-          if (practical.isNotEmpty) ...[
-            SizedBox(height: theoretical.isNotEmpty ? 8 : 0),
-            Text(
-              'group_practical_label'.tr,
-              style: const TextStyle(
-                color: AppColors.accent,
-                fontWeight: FontWeight.w500,
+              ...practical.map(
+                (s) => ScheduleRow(schedule: s, subjectId: group.subjectId),
               ),
-            ),
-            ...practical.map(
-              (s) => ScheduleRow(schedule: s, subjectId: group.subjectId),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -621,9 +460,9 @@ class ScheduleRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
+    Color? primaryTextColor = theme.textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = theme.textTheme.bodyMedium?.color;
 
     return Padding(
       padding: const EdgeInsets.only(top: 4.0, left: 8.0),
@@ -640,15 +479,13 @@ class ScheduleRow extends ConsumerWidget {
             constraints: const BoxConstraints(),
             padding: const EdgeInsets.all(4),
             icon: const Icon(Icons.edit, color: AppColors.accent),
-            onPressed:
-                () => showDialog(
-                  context: context,
-                  builder:
-                      (_) => _EditScheduleDialog(
-                        schedule: schedule,
-                        subjectId: subjectId,
-                      ),
-                ),
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => _EditScheduleDialog(
+                schedule: schedule,
+                subjectId: subjectId,
+              ),
+            ),
           ),
           IconButton(
             iconSize: 18,
@@ -660,43 +497,72 @@ class ScheduleRow extends ConsumerWidget {
                 context: context,
                 builder: (BuildContext context) {
                   return AlertDialog(
-                    backgroundColor: lighterColor,
-                    title: Text(
-                      'delete_schedule_title'.tr,
-                      style: TextStyle(color: primaryTextColor),
-                    ),
-                    content: Text(
-                      'delete_schedule_confirm'.trParams({
-                        'type':
-                            schedule.scheduleType == 'THEORETICAL'
-                                ? 'schedule_type_theoretical'.tr
-                                : 'schedule_type_practical'.tr,
-                      }),
-                      style: TextStyle(color: secondaryTextColor),
-                    ),
-                    actions: <Widget>[
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text(
-                          'cancel'.tr,
-                          style: TextStyle(color: secondaryTextColor),
+                    backgroundColor: theme.brightness == Brightness.dark
+                        ? Colors.transparent
+                        : theme.cardColor,
+                    elevation: 0,
+                    contentPadding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    content: GlassCard(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                            top: 24, left: 24, right: 24, bottom: 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'delete_schedule_title'.tr,
+                              style: TextStyle(
+                                  color: primaryTextColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'delete_schedule_confirm'.trParams({
+                                'type': schedule.scheduleType == 'THEORETICAL'
+                                    ? 'schedule_type_theoretical'.tr
+                                    : 'schedule_type_practical'.tr,
+                              }),
+                              style: TextStyle(color: secondaryTextColor),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: <Widget>[
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: Text(
+                                    'cancel'.tr,
+                                    style: TextStyle(color: secondaryTextColor),
+                                  ),
+                                ),
+                                TextButton(
+                                  child: Text(
+                                    'delete_button'.tr,
+                                    style:
+                                        const TextStyle(color: AppColors.error),
+                                  ),
+                                  onPressed: () async {
+                                    await ref
+                                        .read(subjectsRepositoryProvider)
+                                        .deleteSchedule(schedule.id);
+                                    ref.invalidate(
+                                        subjectGroupsProvider(subjectId));
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      TextButton(
-                        child: Text(
-                          'delete_button'.tr,
-                          style: const TextStyle(color: AppColors.error),
-                        ),
-                        onPressed: () async {
-                          await ref
-                              .read(subjectsRepositoryProvider)
-                              .deleteSchedule(schedule.id);
-                          // ignore: unused_result
-                          ref.refresh(subjectGroupsProvider(subjectId).future);
-                          if (context.mounted) Navigator.of(context).pop();
-                        },
-                      ),
-                    ],
+                    ),
                   );
                 },
               );
@@ -721,70 +587,92 @@ class _DeleteGroupConfirmationDialogState
   bool _isDeleting = false;
   @override
   Widget build(BuildContext context) {
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
+    Color? primaryTextColor = theme.textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = theme.textTheme.bodyMedium?.color;
 
     return AlertDialog(
-      backgroundColor: lighterColor,
-      title: Text(
-        'delete_group_title'.tr,
-        style: TextStyle(color: primaryTextColor),
-      ),
-      content: Text(
-        'delete_group_confirm'.trParams({'code': widget.group.groupCode}),
-        style: TextStyle(color: secondaryTextColor),
-      ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('cancel'.tr, style: TextStyle(color: secondaryTextColor)),
-        ),
-        TextButton(
-          onPressed:
-              _isDeleting
-                  ? null
-                  : () async {
-                    setState(() => _isDeleting = true);
-                    try {
-                      await ref
-                          .read(subjectsRepositoryProvider)
-                          .deleteGroup(widget.group.id);
-                      // ignore: unused_result
-                      ref.refresh(
-                        subjectGroupsProvider(widget.group.subjectId).future,
-                      );
-                      // ignore: use_build_context_synchronously
-                      if (mounted) Navigator.of(context).pop();
-                    } catch (e) {
-                      if (mounted) {
-                        // ignore: use_build_context_synchronously
-                        Navigator.of(context).pop();
-                        showFeedbackSnackbar(
-                          // ignore: use_build_context_synchronously
-                          context,
-                          'error_delete_failed'.tr,
-                          isError: true,
-                        );
-                      }
-                    }
-                  },
-          child:
-              _isDeleting
-                  ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.error,
-                    ),
-                  )
-                  : Text(
-                    'delete_button'.tr,
-                    style: const TextStyle(color: AppColors.error),
+      backgroundColor: theme.brightness == Brightness.dark
+          ? Colors.transparent
+          : theme.cardColor,
+      elevation: 0,
+      contentPadding: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      content: GlassCard(
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding:
+              const EdgeInsets.only(top: 24, left: 24, right: 24, bottom: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'delete_group_title'.tr,
+                style: TextStyle(
+                    color: primaryTextColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'delete_group_confirm'
+                    .trParams({'code': widget.group.groupCode}),
+                style: TextStyle(color: secondaryTextColor),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text('cancel'.tr,
+                        style: TextStyle(color: secondaryTextColor)),
                   ),
+                  TextButton(
+                    onPressed: _isDeleting
+                        ? null
+                        : () async {
+                            setState(() => _isDeleting = true);
+                            try {
+                              await ref
+                                  .read(subjectsRepositoryProvider)
+                                  .deleteGroup(widget.group.id);
+                              ref.invalidate(
+                                subjectGroupsProvider(widget.group.subjectId),
+                              );
+                              if (mounted) Navigator.of(context).pop();
+                            } catch (e) {
+                              if (mounted) {
+                                Navigator.of(context).pop();
+                                showFeedbackSnackbar(
+                                  context,
+                                  'error_delete_failed'.tr,
+                                  isError: true,
+                                );
+                              }
+                            }
+                          },
+                    child: _isDeleting
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.error,
+                            ),
+                          )
+                        : Text(
+                            'delete_button'.tr,
+                            style: const TextStyle(color: AppColors.error),
+                          ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -819,20 +707,45 @@ class _AddScheduleDialogState extends ConsumerState<_AddScheduleDialog> {
     final picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
-      builder:
-          (context, child) => Theme(
-            data: ThemeData.dark().copyWith(
-              colorScheme: ColorScheme.dark(
-                primary: AppColors.primary,
-                onPrimary: Theme.of(context).textTheme.bodyLarge!.color!,
-                surface: Theme.of(context).scaffoldBackgroundColor,
-                onSurface: Theme.of(context).textTheme.bodyLarge!.color!,
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        return Theme(
+          data: theme.copyWith(
+            timePickerTheme: TimePickerThemeData(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              // ignore: deprecated_member_use
-              dialogBackgroundColor: Theme.of(context).cardColor,
+              backgroundColor: theme.brightness == Brightness.dark
+                  ? AppColors.darkSurface
+                  : AppColors.lightBackground,
+              hourMinuteShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              hourMinuteColor: AppColors.primary,
+              hourMinuteTextColor: Colors.white,
+              dialBackgroundColor: theme.colorScheme.surface,
+              dialHandColor: AppColors.primary,
+              dialTextColor: theme.colorScheme.onSurface,
+              dayPeriodShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              dayPeriodColor: MaterialStateColor.resolveWith((states) =>
+                  states.contains(MaterialState.selected)
+                      ? AppColors.accent
+                      : theme.colorScheme.surface),
+              dayPeriodTextColor: MaterialStateColor.resolveWith((states) =>
+                  states.contains(MaterialState.selected)
+                      ? Colors.white
+                      : theme.colorScheme.onSurface),
             ),
-            child: child!,
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.onSurface),
+            ),
           ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() => isStart ? _startTime = picked : _endTime = picked);
@@ -862,65 +775,57 @@ class _AddScheduleDialogState extends ConsumerState<_AddScheduleDialog> {
         '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}:00';
     final groupCode = _groupCodeController.text.trim();
     try {
-      final conflict = await ref
-          .read(subjectsRepositoryProvider)
-          .checkGroupConflict(
-            subjectId: widget.subjectId,
-            groupCode: groupCode,
-            scheduleType:
-                _selectedType == 'schedule_type_theoretical'
+      final conflict =
+          await ref.read(subjectsRepositoryProvider).checkGroupConflict(
+                subjectId: widget.subjectId,
+                groupCode: groupCode,
+                scheduleType: _selectedType == 'schedule_type_theoretical'
                     ? 'THEORETICAL'
                     : 'PRACTICAL',
-            dayOfWeek:
-                _selectedDay == 'day_sunday'
+                dayOfWeek: _selectedDay == 'day_sunday'
                     ? 'Sunday'
                     : _selectedDay == 'day_monday'
-                    ? 'Monday'
-                    : _selectedDay == 'day_tuesday'
-                    ? 'Tuesday'
-                    : _selectedDay == 'day_wednesday'
-                    ? 'Wednesday'
-                    : _selectedDay == 'day_thursday'
-                    ? 'Thursday'
-                    : _selectedDay == 'day_friday'
-                    ? 'Friday'
-                    : 'Saturday',
-            startTime: startTimeStr,
-            endTime: endTimeStr,
-          );
+                        ? 'Monday'
+                        : _selectedDay == 'day_tuesday'
+                            ? 'Tuesday'
+                            : _selectedDay == 'day_wednesday'
+                                ? 'Wednesday'
+                                : _selectedDay == 'day_thursday'
+                                    ? 'Thursday'
+                                    : _selectedDay == 'day_friday'
+                                        ? 'Friday'
+                                        : 'Saturday',
+                startTime: startTimeStr,
+                endTime: endTimeStr,
+              );
       if (conflict != null) {
         if (mounted) showFeedbackSnackbar(context, conflict, isError: true);
         setState(() => _isLoading = false);
         return;
       }
-      await ref
-          .read(subjectsRepositoryProvider)
-          .addGroupWithSchedule(
+      await ref.read(subjectsRepositoryProvider).addGroupWithSchedule(
             subjectId: widget.subjectId,
             groupCode: groupCode,
-            dayOfWeek:
-                _selectedDay == 'day_sunday'
-                    ? 'Sunday'
-                    : _selectedDay == 'day_monday'
+            dayOfWeek: _selectedDay == 'day_sunday'
+                ? 'Sunday'
+                : _selectedDay == 'day_monday'
                     ? 'Monday'
                     : _selectedDay == 'day_tuesday'
-                    ? 'Tuesday'
-                    : _selectedDay == 'day_wednesday'
-                    ? 'Wednesday'
-                    : _selectedDay == 'day_thursday'
-                    ? 'Thursday'
-                    : _selectedDay == 'day_friday'
-                    ? 'Friday'
-                    : 'Saturday',
+                        ? 'Tuesday'
+                        : _selectedDay == 'day_wednesday'
+                            ? 'Wednesday'
+                            : _selectedDay == 'day_thursday'
+                                ? 'Thursday'
+                                : _selectedDay == 'day_friday'
+                                    ? 'Friday'
+                                    : 'Saturday',
             startTime: startTimeStr,
             endTime: endTimeStr,
-            scheduleType:
-                _selectedType == 'schedule_type_theoretical'
-                    ? 'THEORETICAL'
-                    : 'PRACTICAL',
+            scheduleType: _selectedType == 'schedule_type_theoretical'
+                ? 'THEORETICAL'
+                : 'PRACTICAL',
           );
-      // ignore: unused_result
-      ref.refresh(subjectGroupsProvider(widget.subjectId).future);
+      ref.invalidate(subjectGroupsProvider(widget.subjectId));
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
@@ -943,142 +848,179 @@ class _AddScheduleDialogState extends ConsumerState<_AddScheduleDialog> {
 
   @override
   Widget build(BuildContext context) {
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
+    Color? primaryTextColor = theme.textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = theme.textTheme.bodyMedium?.color;
 
-    final inputDecoration = InputDecoration(
-      labelStyle: TextStyle(color: secondaryTextColor),
-      enabledBorder: UnderlineInputBorder(
-        // ignore: deprecated_member_use
-        borderSide: BorderSide(color: secondaryTextColor!.withOpacity(0.5)),
+    final customInputDecoration = InputDecoration(
+      filled: true,
+      fillColor: Colors.black.withOpacity(0.2),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8.0),
+        borderSide: BorderSide.none,
       ),
-      focusedBorder: const UnderlineInputBorder(
+      enabledBorder: const UnderlineInputBorder(
         borderSide: BorderSide(color: AppColors.primary),
       ),
+      focusedBorder: const UnderlineInputBorder(
+        borderSide: BorderSide(color: AppColors.primary, width: 2),
+      ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12.0, vertical: 15.0),
     );
+
     return AlertDialog(
-      backgroundColor: lighterColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: theme.brightness == Brightness.dark
+          ? const Color(0xFF2D3748)
+          : theme.cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text(
         'groups_add_button'.tr,
-        style: TextStyle(color: primaryTextColor),
+        style: TextStyle(
+            color: primaryTextColor, fontSize: 20, fontWeight: FontWeight.bold),
       ),
       content: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _groupCodeController,
-                decoration: inputDecoration.copyWith(
-                  labelText: 'group_code_hint'.tr,
-                ),
-                style: TextStyle(color: primaryTextColor),
-                validator:
-                    (v) =>
-                        (v == null || v.isEmpty)
-                            ? 'error_field_empty'.tr
-                            : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _groupCodeController,
+              decoration: customInputDecoration.copyWith(
+                hintText: 'group_code_hint'.tr,
+                hintStyle: TextStyle(color: secondaryTextColor),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedDay,
-                hint: Text(
-                  'select_day_hint'.tr,
-                  style: TextStyle(color: secondaryTextColor),
-                ),
-                onChanged: (v) => setState(() => _selectedDay = v),
-                items:
-                    _days
-                        .map(
-                          (d) => DropdownMenuItem(value: d, child: Text(d.tr)),
-                        )
-                        .toList(),
-                decoration: inputDecoration,
-                dropdownColor: darkerColor,
-                style: TextStyle(color: primaryTextColor),
-                validator: (v) => v == null ? 'error_please_select'.tr : null,
+              style: TextStyle(color: primaryTextColor, fontSize: 16),
+              validator: (v) =>
+                  (v == null || v.isEmpty) ? 'error_field_empty'.tr : null,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedDay,
+              hint: Text(
+                'select_day_hint'.tr,
+                style: TextStyle(color: secondaryTextColor),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _selectedType,
-                hint: Text(
-                  'select_type_hint'.tr,
-                  style: TextStyle(color: secondaryTextColor),
-                ),
-                onChanged: (v) => setState(() => _selectedType = v),
-                items:
-                    _types
-                        .map(
-                          (t) => DropdownMenuItem(value: t, child: Text(t.tr)),
-                        )
-                        .toList(),
-                decoration: inputDecoration,
-                dropdownColor: darkerColor,
-                style: TextStyle(color: primaryTextColor),
-                validator: (v) => v == null ? 'error_please_select'.tr : null,
+              onChanged: (v) => setState(() => _selectedDay = v),
+              items: _days
+                  .map(
+                    (d) => DropdownMenuItem(value: d, child: Text(d.tr)),
+                  )
+                  .toList(),
+              decoration: customInputDecoration,
+              dropdownColor: theme.brightness == Brightness.dark
+                  ? const Color(0xFF2D3748)
+                  : theme.cardColor,
+              style: TextStyle(color: primaryTextColor, fontSize: 16),
+              icon: Icon(Icons.keyboard_arrow_down, color: primaryTextColor),
+              validator: (v) => v == null ? 'error_please_select'.tr : null,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedType,
+              hint: Text(
+                'select_type_hint'.tr,
+                style: TextStyle(color: secondaryTextColor),
               ),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  '${'time_start_label'.tr}: ${_startTime?.format(context) ?? 'time_not_set'.tr}',
-                  style: TextStyle(color: secondaryTextColor),
-                ),
-                trailing: const Icon(
-                  Icons.access_time,
-                  color: AppColors.primary,
-                ),
-                onTap: () => _pickTime(true),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  '${'time_end_label'.tr}: ${_endTime?.format(context) ?? 'time_not_set'.tr}',
-                  style: TextStyle(color: secondaryTextColor),
-                ),
-                trailing: const Icon(
-                  Icons.access_time,
-                  color: AppColors.primary,
-                ),
-                onTap: () => _pickTime(false),
-              ),
-            ],
-          ),
+              onChanged: (v) => setState(() => _selectedType = v),
+              items: _types
+                  .map(
+                    (t) => DropdownMenuItem(value: t, child: Text(t.tr)),
+                  )
+                  .toList(),
+              decoration: customInputDecoration,
+              dropdownColor: theme.brightness == Brightness.dark
+                  ? const Color(0xFF2D3748)
+                  : theme.cardColor,
+              style: TextStyle(color: primaryTextColor, fontSize: 16),
+              icon: Icon(Icons.keyboard_arrow_down, color: primaryTextColor),
+              validator: (v) => v == null ? 'error_please_select'.tr : null,
+            ),
+            const SizedBox(height: 24),
+            _buildTimePickerRow(
+              context: context,
+              label: 'time_start_label'.tr,
+              timeOfDay: _startTime,
+              onTap: () => _pickTime(true),
+            ),
+            const SizedBox(height: 16),
+            _buildTimePickerRow(
+              context: context,
+              label: 'time_end_label'.tr,
+              timeOfDay: _endTime,
+              onTap: () => _pickTime(false),
+            ),
+          ],
         ),
       ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
           child: Text('cancel'.tr, style: TextStyle(color: secondaryTextColor)),
         ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _submitForm,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+        // --- THE FIX IS HERE ---
+        // Replaced ElevatedButton with our consistent, gradient-enabled CustomButton
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.all(12.0),
+            child: SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                  color: AppColors.primary, strokeWidth: 2),
             ),
+          )
+        else
+          CustomButton(
+            onPressed: _submitForm,
+            text: 'save_button'.tr,
+            gradient: AppColors.primaryGradient,
           ),
-          child:
-              _isLoading
-                  ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: primaryTextColor,
-                    ),
-                  )
-                  : Text(
-                    'save_button'.tr,
-                    style: TextStyle(color: primaryTextColor),
-                  ),
-        ),
       ],
+    );
+  }
+
+  Widget _buildTimePickerRow({
+    required BuildContext context,
+    required String label,
+    required TimeOfDay? timeOfDay,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final formattedTime = timeOfDay?.format(context) ?? 'time_not_set'.tr;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color,
+                fontSize: 16,
+              ),
+            ),
+            Row(
+              children: [
+                Text(
+                  formattedTime,
+                  style: TextStyle(
+                    color: theme.textTheme.bodyLarge?.color,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.access_time_rounded, color: AppColors.primary),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1131,27 +1073,51 @@ class _EditScheduleDialogState extends ConsumerState<_EditScheduleDialog> {
   }
 
   Future<void> _pickTime(bool isStart) async {
-    final initial =
-        isStart
-            ? (_startTime ?? TimeOfDay.now())
-            : (_endTime ?? TimeOfDay.now());
+    final initial = isStart
+        ? (_startTime ?? TimeOfDay.now())
+        : (_endTime ?? TimeOfDay.now());
     final picked = await showTimePicker(
       context: context,
       initialTime: initial,
-      builder:
-          (context, child) => Theme(
-            data: ThemeData.dark().copyWith(
-              colorScheme: ColorScheme.dark(
-                primary: AppColors.primary,
-                onPrimary: Theme.of(context).textTheme.bodyLarge!.color!,
-                surface: Theme.of(context).scaffoldBackgroundColor,
-                onSurface: Theme.of(context).textTheme.bodyLarge!.color!,
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        return Theme(
+          data: theme.copyWith(
+            timePickerTheme: TimePickerThemeData(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-              // ignore: deprecated_member_use
-              dialogBackgroundColor: Theme.of(context).cardColor,
+              backgroundColor: theme.brightness == Brightness.dark
+                  ? AppColors.darkSurface
+                  : AppColors.lightBackground,
+              hourMinuteShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              hourMinuteColor: AppColors.primary,
+              hourMinuteTextColor: Colors.white,
+              dialBackgroundColor: theme.colorScheme.surface,
+              dialHandColor: AppColors.primary,
+              dialTextColor: theme.colorScheme.onSurface,
+              dayPeriodShape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              dayPeriodColor: MaterialStateColor.resolveWith((states) =>
+                  states.contains(MaterialState.selected)
+                      ? AppColors.accent
+                      : theme.colorScheme.surface),
+              dayPeriodTextColor: MaterialStateColor.resolveWith((states) =>
+                  states.contains(MaterialState.selected)
+                      ? Colors.white
+                      : theme.colorScheme.onSurface),
             ),
-            child: child!,
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                  foregroundColor: theme.colorScheme.onSurface),
+            ),
           ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() => isStart ? _startTime = picked : _endTime = picked);
@@ -1170,32 +1136,28 @@ class _EditScheduleDialogState extends ConsumerState<_EditScheduleDialog> {
     final endTimeStr =
         '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}:00';
     try {
-      final conflict = await ref
-          .read(subjectsRepositoryProvider)
-          .checkGroupConflict(
-            subjectId: widget.subjectId,
-            groupCode: "N/A",
-            scheduleType: widget.schedule.scheduleType,
-            dayOfWeek: _keyToDay(_selectedDay!),
-            startTime: startTimeStr,
-            endTime: endTimeStr,
-            editingScheduleId: widget.schedule.id,
-          );
+      final conflict =
+          await ref.read(subjectsRepositoryProvider).checkGroupConflict(
+                subjectId: widget.subjectId,
+                groupCode: "N/A",
+                scheduleType: widget.schedule.scheduleType,
+                dayOfWeek: _keyToDay(_selectedDay!),
+                startTime: startTimeStr,
+                endTime: endTimeStr,
+                editingScheduleId: widget.schedule.id,
+              );
       if (conflict != null) {
         if (mounted) showFeedbackSnackbar(context, conflict, isError: true);
         setState(() => _isLoading = false);
         return;
       }
-      await ref
-          .read(subjectsRepositoryProvider)
-          .updateSchedule(
+      await ref.read(subjectsRepositoryProvider).updateSchedule(
             widget.schedule.id,
             dayOfWeek: _keyToDay(_selectedDay!),
             startTime: startTimeStr,
             endTime: endTimeStr,
           );
-      // ignore: unused_result
-      ref.refresh(subjectGroupsProvider(widget.subjectId).future);
+      ref.invalidate(subjectGroupsProvider(widget.subjectId));
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
@@ -1212,110 +1174,144 @@ class _EditScheduleDialogState extends ConsumerState<_EditScheduleDialog> {
 
   @override
   Widget build(BuildContext context) {
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
+    Color? primaryTextColor = theme.textTheme.bodyLarge?.color;
+    Color? secondaryTextColor = theme.textTheme.bodyMedium?.color;
 
-    final inputDecoration = InputDecoration(
-      labelStyle: TextStyle(color: secondaryTextColor),
-      enabledBorder: UnderlineInputBorder(
-        // ignore: deprecated_member_use
-        borderSide: BorderSide(color: secondaryTextColor!.withOpacity(0.5)),
-      ),
-      focusedBorder: const UnderlineInputBorder(
-        borderSide: BorderSide(color: AppColors.primary),
-      ),
-    );
     return AlertDialog(
-      backgroundColor: lighterColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      backgroundColor: theme.brightness == Brightness.dark
+          ? const Color(0xFF2D3748)
+          : theme.cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text(
         'edit_schedule_title'.tr,
-        style: TextStyle(color: primaryTextColor),
+        style: TextStyle(
+            color: primaryTextColor, fontSize: 20, fontWeight: FontWeight.bold),
       ),
       content: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                value: _selectedDay,
-                hint: Text(
-                  'select_day_hint'.tr,
-                  style: TextStyle(color: secondaryTextColor),
-                ),
-                onChanged: (v) => setState(() => _selectedDay = v),
-                items:
-                    _days
-                        .map(
-                          (d) => DropdownMenuItem(value: d, child: Text(d.tr)),
-                        )
-                        .toList(),
-                decoration: inputDecoration,
-                dropdownColor: darkerColor,
-                style: TextStyle(color: primaryTextColor),
-                validator: (v) => v == null ? 'error_please_select'.tr : null,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DropdownButtonFormField<String>(
+              value: _selectedDay,
+              hint: Text(
+                'select_day_hint'.tr,
+                style: TextStyle(color: secondaryTextColor),
               ),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  '${'time_start_label'.tr}: ${_startTime?.format(context) ?? 'time_not_set'.tr}',
-                  style: TextStyle(color: secondaryTextColor),
+              onChanged: (v) => setState(() => _selectedDay = v),
+              items: _days
+                  .map((d) => DropdownMenuItem(value: d, child: Text(d.tr)))
+                  .toList(),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.black.withOpacity(0.2),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                  borderSide: BorderSide.none,
                 ),
-                trailing: const Icon(
-                  Icons.access_time,
-                  color: AppColors.primary,
+                enabledBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.primary),
                 ),
-                onTap: () => _pickTime(true),
+                focusedBorder: const UnderlineInputBorder(
+                  borderSide: BorderSide(color: AppColors.primary, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12.0, vertical: 15.0),
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  '${'time_end_label'.tr}: ${_endTime?.format(context) ?? 'time_not_set'.tr}',
-                  style: TextStyle(color: secondaryTextColor),
-                ),
-                trailing: const Icon(
-                  Icons.access_time,
-                  color: AppColors.primary,
-                ),
-                onTap: () => _pickTime(false),
-              ),
-            ],
-          ),
+              dropdownColor: theme.brightness == Brightness.dark
+                  ? const Color(0xFF2D3748)
+                  : theme.cardColor,
+              style: TextStyle(color: primaryTextColor, fontSize: 16),
+              icon: Icon(Icons.keyboard_arrow_down, color: primaryTextColor),
+              validator: (v) => v == null ? 'error_please_select'.tr : null,
+            ),
+            const SizedBox(height: 24),
+            _buildTimePickerRow(
+              context: context,
+              label: 'time_start_label'.tr,
+              timeOfDay: _startTime,
+              onTap: () => _pickTime(true),
+            ),
+            const SizedBox(height: 16),
+            _buildTimePickerRow(
+              context: context,
+              label: 'time_end_label'.tr,
+              timeOfDay: _endTime,
+              onTap: () => _pickTime(false),
+            ),
+          ],
         ),
       ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
           child: Text('cancel'.tr, style: TextStyle(color: secondaryTextColor)),
         ),
-        ElevatedButton(
-          onPressed: _isLoading ? null : _submitForm,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+        // --- THE FIX IS HERE ---
+        // Replaced ElevatedButton with our consistent, reusable CustomButton.
+        if (_isLoading)
+          const Padding(
+            padding: EdgeInsets.all(12.0),
+            child: SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                  color: AppColors.primary, strokeWidth: 2),
             ),
+          )
+        else
+          CustomButton(
+            onPressed: _submitForm,
+            text: 'update_button'.tr,
+            gradient: AppColors.primaryGradient,
           ),
-          child:
-              _isLoading
-                  ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: primaryTextColor,
-                    ),
-                  )
-                  : Text(
-                    'update_button'.tr,
-                    style: TextStyle(color: primaryTextColor),
-                  ),
-        ),
       ],
+    );
+  }
+
+  Widget _buildTimePickerRow({
+    required BuildContext context,
+    required String label,
+    required TimeOfDay? timeOfDay,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    final formattedTime = timeOfDay?.format(context) ?? 'time_not_set'.tr;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color,
+                fontSize: 16,
+              ),
+            ),
+            Row(
+              children: [
+                Text(
+                  formattedTime,
+                  style: TextStyle(
+                    color: theme.textTheme.bodyLarge?.color,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.access_time_rounded, color: AppColors.primary),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

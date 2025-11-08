@@ -1,5 +1,7 @@
 // lib/onboarding/widgets/step_indicator.dart
+
 import 'package:flutter/material.dart';
+import 'package:unicurve/core/utils/colors.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 
 class StepIndicator extends StatelessWidget {
@@ -34,7 +36,8 @@ class StepIndicator extends StatelessWidget {
       height: scaleConfig.scale(8),
       width: isActive ? scaleConfig.scale(24) : scaleConfig.scale(8),
       decoration: BoxDecoration(
-        color: isActive ? const Color(0xFF24C28F) : Colors.grey[800],
+        // UPDATED: Active color uses our palette, inactive color uses theme's divider color
+        color: isActive ? AppColors.primary : Theme.of(context).dividerColor,
         borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
       ),
     );

@@ -1,12 +1,17 @@
+// lib/pages/uni_admin/professors/views/professor_details_dialog.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_button.dart';
+import 'package:unicurve/core/utils/custom_snackbar.dart'; // --- FIX: Import the snackbar utility ---
+import 'package:unicurve/core/utils/glass_card.dart';
+import 'package:unicurve/core/utils/glass_loading_overlay.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/domain/models/professor.dart';
 import 'package:unicurve/domain/models/subject.dart';
-import 'package:unicurve/pages/uni_admin/professors/professors_controller.dart';
-import 'package:unicurve/pages/uni_admin/professors/views/detail_row.dart';
+import 'package:unicurve/pages/uni_admin/providers/professors_provider.dart';
 
 class ProfessorDetailsDialog extends ConsumerStatefulWidget {
   final Professor professor;
@@ -25,10 +30,8 @@ class ProfessorDetailsDialog extends ConsumerStatefulWidget {
 class ProfessorDetailsDialogState
     extends ConsumerState<ProfessorDetailsDialog> {
   List<Subject> _canTeachSubjects = [];
-  List<Subject> _teachingSubjects = [];
-  bool _isLoading = false;
   String? _majorName;
-  bool _hasFetchedData = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -37,224 +40,125 @@ class ProfessorDetailsDialogState
   }
 
   Future<void> _fetchDetails() async {
-    if (_hasFetchedData) return;
-
     setState(() => _isLoading = true);
     try {
-      final controller = ref.read(
-        professorsControllerProvider(widget.majorId).notifier,
-      );
-      _majorName = await controller.supabaseService.fetchMajorName(
-        widget.professor.majorId,
-      );
-      final details = await controller.fetchProfessorDetails(widget.professor);
+      final notifier = ref.read(professorsProvider(widget.majorId!).notifier);
+      _majorName = await notifier.supabaseService
+          .fetchMajorName(widget.professor.majorId);
+      final details = await notifier.fetchProfessorDetails(widget.professor);
 
-      _canTeachSubjects =
-          (details['canTeachSubjects'] as List<Subject>)
-              .where(
-                (subject) =>
-                    subject.isOpen ||
-                    _teachingSubjects.any((s) => s.id == subject.id),
-              )
-              .toList();
-      _teachingSubjects =
-          (details['teachingSubjects'] as List<Subject>)
-              .where((subject) => subject.isOpen)
-              .toList();
-
-      _hasFetchedData = true;
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _canTeachSubjects = details['canTeachSubjects'] as List<Subject>;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
-      ref
-          .read(professorsControllerProvider(widget.majorId).notifier)
-          .showSnackBar(
-            'prof_error_fetch_details'.trParams({'error': e.toString()}),
-            isError: true,
-            // ignore: use_build_context_synchronously
-            context: context,
-          );
+      if (mounted) {
+        setState(() => _isLoading = false);
+        Navigator.of(context).pop(); // Close dialog on error
+
+        // --- THE FIX IS HERE: Use the global showFeedbackSnackbar function ---
+        showFeedbackSnackbar(
+          context,
+          'prof_error_fetch_details'.trParams({'error': e.toString()}),
+          isError: true,
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final scaleConfig = context.scaleConfig;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
+    final primaryTextColor = theme.textTheme.bodyLarge?.color;
+    final secondaryTextColor = theme.textTheme.bodyMedium?.color;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
-        side: const BorderSide(color: AppColors.primaryDark, width: 2),
-      ),
-      backgroundColor: darkerColor,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: scaleConfig.scale(320),
-          maxHeight: scaleConfig.scale(400),
-        ),
-        child: Stack(
-          children: [
-            Padding(
-              padding: EdgeInsets.all(scaleConfig.scale(16)),
+    return AlertDialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      contentPadding: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      content: GlassLoadingOverlay(
+        isLoading: _isLoading,
+        child: GlassCard(
+          borderRadius: BorderRadius.circular(16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: scaleConfig.scale(340),
+              maxHeight: scaleConfig.scale(450),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(scaleConfig.scale(24)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.professor.name ?? 'prof_details_unknown_prof'.tr,
-                    style: TextStyle(
-                      color: primaryTextColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: scaleConfig.scaleText(18),
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontSize: scaleConfig.scaleText(20)),
                   ),
-                  SizedBox(height: scaleConfig.scale(12)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'prof_details_major_label_with_name'
+                        .trParams({'majorName': _majorName ?? '...'}),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  Divider(
+                      height: scaleConfig.scale(24), color: theme.dividerColor),
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          DetailRow(
-                            label: 'prof_details_major_label'.tr,
-                            value: _majorName ?? 'not_available'.tr,
-                            scaleConfig: scaleConfig,
-                          ),
-                          SizedBox(height: scaleConfig.scale(12)),
                           Text(
                             'prof_details_can_teach_title'.tr,
-                            style: TextStyle(
-                              color: primaryTextColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: scaleConfig.scaleText(14),
-                            ),
+                            style: theme.textTheme.titleMedium,
                           ),
+                          SizedBox(height: scaleConfig.scale(8)),
                           _canTeachSubjects.isEmpty
-                              ? Padding(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: scaleConfig.scale(8),
-                                ),
-                                child: Text(
+                              ? Text(
                                   'prof_details_no_subjects_available'.tr,
-                                  style: TextStyle(
-                                    color: secondaryTextColor,
-                                    fontSize: scaleConfig.scaleText(14),
-                                  ),
-                                ),
-                              )
+                                  style: TextStyle(color: secondaryTextColor),
+                                )
                               : Column(
-                                children:
-                                    _canTeachSubjects.map((subject) {
-                                      final isTeaching = _teachingSubjects.any(
-                                        (s) => s.id == subject.id,
-                                      );
-                                      return Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          vertical: scaleConfig.scale(4),
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: _canTeachSubjects.map((subject) {
+                                    return Padding(
+                                      padding: EdgeInsets.symmetric(
+                                          vertical: scaleConfig.scale(4)),
+                                      child: Text(
+                                        '• ${subject.name} (${subject.code})',
+                                        style: TextStyle(
+                                          color: primaryTextColor,
+                                          fontSize: scaleConfig.scaleText(14),
                                         ),
-                                        child: Text(
-                                          'prof_details_subject_info'.trParams({
-                                                'code': subject.code,
-                                                'name': subject.name,
-                                                'hours':
-                                                    subject.hours.toString(),
-                                                'level':
-                                                    subject.level.toString(),
-                                              }) +
-                                              (isTeaching
-                                                  ? ' - ${'prof_details_teaching_status'.tr}'
-                                                  : subject.isOpen
-                                                  ? ''
-                                                  : ' - ${'prof_dialog_subject_not_open'.tr}'),
-                                          style: TextStyle(
-                                            color:
-                                                isTeaching
-                                                    ? AppColors.primary
-                                                    : subject.isOpen
-                                                    ? AppColors.accent
-                                                    : Colors.orange,
-                                            fontSize: scaleConfig.scaleText(12),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                              ),
-                          SizedBox(height: scaleConfig.scale(11)),
-                          Text(
-                            'prof_details_currently_teaching_title'.tr,
-                            style: TextStyle(
-                              color: primaryTextColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: scaleConfig.scaleText(14),
-                            ),
-                          ),
-                          _teachingSubjects.isEmpty
-                              ? Padding(
-                                padding: EdgeInsets.symmetric(
-                                  vertical: scaleConfig.scale(8),
+                                      ),
+                                    );
+                                  }).toList(),
                                 ),
-                                child: Text(
-                                  'prof_details_not_teaching'.tr,
-                                  style: TextStyle(
-                                    color: secondaryTextColor,
-                                    fontSize: scaleConfig.scaleText(14),
-                                  ),
-                                ),
-                              )
-                              : Column(
-                                children:
-                                    _teachingSubjects.map((subject) {
-                                      return Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          vertical: scaleConfig.scale(4),
-                                        ),
-                                        child: Text(
-                                          'prof_details_subject_info'.trParams({
-                                            'code': subject.code,
-                                            'name': subject.name,
-                                            'hours': subject.hours.toString(),
-                                            'level': subject.level.toString(),
-                                          }),
-                                          style: TextStyle(
-                                            color: AppColors.primary,
-                                            fontSize: scaleConfig.scaleText(12),
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                              ),
                         ],
                       ),
                     ),
                   ),
-                  SizedBox(height: scaleConfig.scale(12)),
+                  SizedBox(height: scaleConfig.scale(24)),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: TextButton(
+                    child: CustomButton(
                       onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        'close_button'.tr,
-                        style: TextStyle(
-                          color: AppColors.accent,
-                          fontSize: scaleConfig.scaleText(14),
-                        ),
-                      ),
+                      text: 'close_button'.tr,
+                      gradient: AppColors
+                          .primaryGradient, // Use the gradient property
+                      textColor: Colors
+                          .white, // Ensure text is readable on the gradient
                     ),
                   ),
                 ],
               ),
             ),
-            if (_isLoading)
-              Container(
-                color: darkerColor,
-                child: const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-              ),
-          ],
+          ),
         ),
       ),
     );

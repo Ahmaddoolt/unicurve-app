@@ -1,15 +1,22 @@
+// lib/pages/student/subjects/student_subjects_show.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_appbar.dart';
+import 'package:unicurve/core/utils/custom_button.dart';
 import 'package:unicurve/core/utils/custom_snackbar.dart';
+import 'package:unicurve/core/utils/glass_card.dart';
+import 'package:unicurve/core/utils/glass_loading_overlay.dart';
+import 'package:unicurve/core/utils/gradient_icon.dart';
+import 'package:unicurve/core/utils/gradient_scaffold.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/pages/student/subjects/student_curriculum_tree_page.dart';
 
 class ProfessorStatus {
   final String name;
   final bool isActive;
-
   ProfessorStatus({required this.name, required this.isActive});
 }
 
@@ -24,73 +31,126 @@ class StudentSubjectsPage extends StatefulWidget {
 
 class StudentSubjectsPageState extends State<StudentSubjectsPage> {
   final supabase = Supabase.instance.client;
-  List<Map<String, dynamic>> _subjects = [];
+  final List<Map<String, dynamic>> _subjects = [];
   List<Map<String, dynamic>> _filteredSubjects = [];
   Map<int, String> _requirementsMap = {};
 
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
   bool _isLoading = true;
   String? _majorName;
   String? _errorMessage;
+  int? _majorId;
+
+  // --- PAGINATION STATE ---
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 0;
+  static const _pageSize = 20; // Fetch 20 subjects at a time
 
   SubjectSortOrder _currentSortOrder = SubjectSortOrder.byPriority;
 
   @override
   void initState() {
     super.initState();
-    _fetchStudentMajorAndSubjects();
+    _fetchStudentMajorAndSubjects(isRefresh: true);
     _searchController.addListener(_filterSubjects);
+    _scrollController.addListener(_onScroll); // Listener for pagination
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _fetchStudentMajorAndSubjects() async {
-    if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  // --- PAGINATION: This triggers fetching the next page. ---
+  void _onScroll() {
+    if (!_isLoading &&
+        !_isLoadingMore &&
+        _hasMore &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 300) {
+      _fetchStudentMajorAndSubjects();
+    }
+  }
+
+  // --- PAGINATION: This method is now adapted for pagination ---
+  Future<void> _fetchStudentMajorAndSubjects({bool isRefresh = false}) async {
+    if (!mounted || (isRefresh == false && _isLoadingMore)) return;
+
+    if (isRefresh) {
+      setState(() {
+        _isLoading = true;
+        _currentPage = 0;
+        _subjects.clear();
+        _filteredSubjects.clear();
+        _hasMore = true;
+        _errorMessage = null;
+      });
+    } else {
+      setState(() => _isLoadingMore = true);
+    }
 
     try {
-      final userId = supabase.auth.currentUser?.id;
-      if (userId == null) throw Exception('error_user_not_logged_in'.tr);
+      if (_majorId == null) {
+        final userId = supabase.auth.currentUser?.id;
+        if (userId == null) throw Exception('error_user_not_logged_in'.tr);
 
-      final studentResponse =
-          await supabase
-              .from('students')
-              .select('major_id, majors(name)')
-              .eq('user_id', userId)
-              .single();
+        final studentResponse = await supabase
+            .from('students')
+            .select('major_id, majors(name)')
+            .eq('user_id', userId)
+            .single();
 
-      final majorId = studentResponse['major_id'];
-      if (majorId == null) throw Exception('error_not_in_major'.tr);
+        _majorId = studentResponse['major_id'];
+        if (_majorId == null) throw Exception('error_not_in_major'.tr);
 
-      final majorData = studentResponse['majors'];
-      final majorName =
-          majorData?['name'] as String? ?? 'your_major_fallback'.tr;
+        final majorData = studentResponse['majors'];
+        _majorName =
+            majorData?['name'] as String? ?? 'your_major_fallback'.tr;
+      }
 
-      final results = await Future.wait([
-        supabase
-            .from('subjects')
-            .select('*, subject_professors(isActive, professors(name))')
-            .eq('major_id', majorId),
-        supabase
+      if (isRefresh) {
+        final requirementsResponse = await supabase
             .from('major_requirements')
             .select('id, requirement_name')
-            .eq('major_id', majorId),
-      ]);
+            .eq('major_id', _majorId!);
+        _requirementsMap = {
+          for (var req in requirementsResponse)
+            (req['id'] as int): req['requirement_name'] as String,
+        };
+      }
 
-      final subjectsResponse = results[0] as List<dynamic>;
-      final requirementsResponse = results[1] as List<dynamic>;
+      // --- PAGINATION: Calculate range for Supabase query ---
+      final from = _currentPage * _pageSize;
+      final to = from + _pageSize - 1;
 
-      final requirementsMap = {
-        for (var req in requirementsResponse)
-          (req['id'] as int): req['requirement_name'] as String,
-      };
+      PostgrestTransformBuilder<PostgrestList> query = supabase
+          .from('subjects')
+          .select('*, subject_professors(isActive, professors(name))')
+          .eq('major_id', _majorId!);
+
+      switch (_currentSortOrder) {
+        case SubjectSortOrder.byPriority:
+          query = query.order('priority', ascending: false, nullsFirst: false);
+          break;
+        case SubjectSortOrder.byLevel:
+          query = query.order('level', ascending: true);
+          break;
+        case SubjectSortOrder.byCode:
+          query = query.order('code', ascending: true);
+          break;
+        case SubjectSortOrder.byName:
+          query = query.order('name', ascending: true);
+          break;
+      }
+
+      // --- PAGINATION: Apply the range to the query ---
+      final subjectsResponse = await query.range(from, to);
 
       final List<Map<String, dynamic>> processedSubjects = [];
       for (var subjectData in subjectsResponse) {
@@ -119,120 +179,84 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
 
       if (mounted) {
         setState(() {
-          _majorName = majorName;
-          _subjects = processedSubjects;
-          _requirementsMap = requirementsMap;
-          _isLoading = false;
+          _subjects.addAll(processedSubjects); // Append new subjects
+          _hasMore = processedSubjects.length == _pageSize; // Check if more exist
+          _currentPage++; // Increment page for next fetch
+          _filterSubjects();
         });
-        _applySortAndFilter();
       }
     } catch (e) {
       if (mounted) {
+        _errorMessage = 'error_wifi'.tr;
+        showFeedbackSnackbar(context, _errorMessage!, isError: true);
+      }
+    } finally {
+      if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'error_wifi'.tr;
-          showFeedbackSnackbar(context, _errorMessage!, isError: true);
+          _isLoadingMore = false;
         });
       }
     }
   }
 
-  void _sortSubjects() {
-    _subjects.sort((a, b) {
-      switch (_currentSortOrder) {
-        case SubjectSortOrder.byPriority:
-          final priorityA = a['priority'] as int? ?? -1;
-          final priorityB = b['priority'] as int? ?? -1;
-          return priorityB.compareTo(priorityA);
-        case SubjectSortOrder.byLevel:
-          final levelA = a['level'] as int? ?? 999;
-          final levelB = b['level'] as int? ?? 999;
-          return levelA.compareTo(levelB);
-        case SubjectSortOrder.byCode:
-          final codeA = a['code']?.toString() ?? '';
-          final codeB = b['code']?.toString() ?? '';
-          return codeA.compareTo(codeB);
-        case SubjectSortOrder.byName:
-          final nameA = a['name']?.toString() ?? '';
-          final nameB = b['name']?.toString() ?? '';
-          return nameA.compareTo(nameB);
-      }
-    });
-  }
-
   void _applySortAndFilter() {
-    _sortSubjects();
-    _filterSubjects();
+    _fetchStudentMajorAndSubjects(isRefresh: true);
   }
 
   void _filterSubjects() {
     final query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredSubjects =
-          query.isEmpty
-              ? List.from(_subjects)
-              : _subjects.where((subject) {
-                final name = subject['name']?.toString().toLowerCase() ?? '';
-                final code = subject['code']?.toString().toLowerCase() ?? '';
-                final typeName =
-                    _requirementsMap[subject['type']]?.toLowerCase() ?? '';
-                final professors =
-                    subject['professors'] as List<ProfessorStatus>;
-                final hasProfessorMatch = professors.any(
-                  (p) => p.name.toLowerCase().contains(query),
-                );
-                return name.contains(query) ||
-                    code.contains(query) ||
-                    typeName.contains(query) ||
-                    hasProfessorMatch;
-              }).toList();
+      _filteredSubjects = _subjects.where((subject) {
+        final name = subject['name']?.toString().toLowerCase() ?? '';
+        final code = subject['code']?.toString().toLowerCase() ?? '';
+        final typeName =
+            _requirementsMap[subject['type']]?.toLowerCase() ?? '';
+        final professors = subject['professors'] as List<ProfessorStatus>;
+        final hasProfessorMatch =
+            professors.any((p) => p.name.toLowerCase().contains(query));
+        return name.contains(query) ||
+            code.contains(query) ||
+            typeName.contains(query) ||
+            hasProfessorMatch;
+      }).toList();
     });
   }
 
   void _showSortOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).cardColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'sort_by_title'.tr,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _buildSortOption(
-                title: 'priority_label'.tr,
-                icon: Icons.star_border,
-                order: SubjectSortOrder.byPriority,
-              ),
-              _buildSortOption(
-                title: 'level_label'.tr,
-                icon: Icons.layers_outlined,
-                order: SubjectSortOrder.byLevel,
-              ),
-              _buildSortOption(
-                title: 'subject_name_label'.tr,
-                icon: Icons.sort_by_alpha,
-                order: SubjectSortOrder.byName,
-              ),
-              _buildSortOption(
-                title: 'subject_code_label'.tr,
-                icon: Icons.pin_outlined,
-                order: SubjectSortOrder.byCode,
-              ),
-            ],
+        return GlassCard(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('sort_by_title'.tr,
+                    style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                _buildSortOption(
+                    title: 'priority_label'.tr,
+                    icon: Icons.star_border,
+                    order: SubjectSortOrder.byPriority),
+                _buildSortOption(
+                    title: 'level_label'.tr,
+                    icon: Icons.layers_outlined,
+                    order: SubjectSortOrder.byLevel),
+                _buildSortOption(
+                    title: 'subject_name_label'.tr,
+                    icon: Icons.sort_by_alpha,
+                    order: SubjectSortOrder.byName),
+                _buildSortOption(
+                    title: 'subject_code_label'.tr,
+                    icon: Icons.pin_outlined,
+                    order: SubjectSortOrder.byCode),
+              ],
+            ),
           ),
         );
       },
@@ -255,10 +279,9 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
         title,
         style: TextStyle(
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color:
-              isSelected
-                  ? AppColors.primary
-                  : Theme.of(context).textTheme.bodyLarge?.color,
+          color: isSelected
+              ? AppColors.primary
+              : Theme.of(context).textTheme.bodyLarge?.color,
         ),
       ),
       trailing:
@@ -275,107 +298,93 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
 
   void _showSubjectDetailsDialog(Map<String, dynamic> subject) {
     final scaleConfig = context.scaleConfig;
+    final theme = Theme.of(context);
     final String typeName =
         _requirementsMap[subject['type']] ?? 'uncategorized_label'.tr;
     final List<ProfessorStatus> professors = subject['professors'] ?? [];
 
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            backgroundColor: Theme.of(context).cardColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(scaleConfig.scale(16)),
-              side: const BorderSide(color: AppColors.primaryDark, width: 1.5),
-            ),
-            title: Center(
-              child: Text(
-                subject['name']?.toString() ?? 'subject_details_title'.tr,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: scaleConfig.scaleText(20),
-                ),
-              ),
-            ),
-            contentPadding: EdgeInsets.all(scaleConfig.scale(16)),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: ListView(
-                shrinkWrap: true,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        contentPadding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: GlassCard(
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: SizedBox(
+              width: scaleConfig.widthPercentage(0.8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildDetailRow(
-                    icon: Icons.tag,
-                    label: 'code_label'.tr,
-                    value: Text(
-                      subject['code']?.toString() ?? 'not_available'.tr,
-                      style: _valueTextStyle(scaleConfig),
-                    ),
+                  Text(
+                    subject['name']?.toString() ?? 'subject_details_title'.tr,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleLarge,
                   ),
-                  _buildDetailRow(
-                    icon: Icons.schedule,
-                    label: 'hours_label'.tr.replaceAll('@hours ', ''),
-                    value: Text(
-                      'hours_label'.trParams({
-                        'hours': subject['hours']?.toString() ?? '0',
-                      }),
-                      style: _valueTextStyle(scaleConfig),
-                    ),
-                  ),
-                  _buildDetailRow(
-                    icon: Icons.bar_chart,
-                    label: 'level_label'.tr,
-                    value: Text(
-                      subject['level']?.toString() ?? 'not_available'.tr,
-                      style: _valueTextStyle(scaleConfig),
-                    ),
-                  ),
-                  _buildDetailRow(
-                    icon: Icons.category_outlined,
-                    label: 'type_label'.tr,
-                    value: Text(typeName, style: _valueTextStyle(scaleConfig)),
-                  ),
-                  _buildDetailRow(
-                    icon: Icons.how_to_reg_outlined,
-                    label: 'open_for_reg_label'.tr,
-                    value: Text(
-                      subject['is_open'] == true ? 'yes'.tr : 'no'.tr,
-                      style: _valueTextStyle(
-                        scaleConfig,
-                        color:
-                            subject['is_open'] == true
-                                ? AppColors.primary
-                                : AppColors.error,
+                  const SizedBox(height: 16),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildDetailRow(
+                              label: 'code_label'.tr,
+                              value: subject['code']?.toString() ?? 'N/A',
+                              icon: Icons.tag),
+                          _buildDetailRow(
+                              label: 'hours_label'.tr.replaceAll('@hours ', ''),
+                              value: 'hours_label'.trParams({
+                                'hours': subject['hours']?.toString() ?? '0'
+                              }),
+                              icon: Icons.schedule),
+                          _buildDetailRow(
+                              label: 'level_label'.tr,
+                              value: subject['level']?.toString() ?? 'N/A',
+                              icon: Icons.bar_chart),
+                          _buildDetailRow(
+                              label: 'type_label'.tr,
+                              value: typeName,
+                              icon: Icons.category_outlined),
+                          _buildDetailRow(
+                              label: 'open_for_reg_label'.tr,
+                              value: subject['is_open'] == true
+                                  ? 'yes'.tr
+                                  : 'no'.tr,
+                              icon: subject['is_open'] == true
+                                  ? Icons.check_circle_outline
+                                  : Icons.highlight_off,
+                              iconColor: subject['is_open'] == true
+                                  ? AppColors.primary
+                                  : AppColors.error),
+                          _buildProfessorSection(
+                              professors: professors, scaleConfig: scaleConfig),
+                          _buildDetailRow(
+                              label: 'description_label'.tr,
+                              value: subject['description']?.toString() ??
+                                  'no_description_provided'.tr,
+                              icon: Icons.description_outlined),
+                        ],
                       ),
                     ),
                   ),
-                  _buildProfessorSection(
-                    professors: professors,
-                    scaleConfig: scaleConfig,
-                  ),
-                  _buildDetailRow(
-                    icon: Icons.description_outlined,
-                    label: 'description_label'.tr,
-                    value: Text(
-                      subject['description']?.toString() ??
-                          'no_description_provided'.tr,
-                      style: _valueTextStyle(scaleConfig),
+                  const SizedBox(height: 24),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: CustomButton(
+                      onPressed: () => Navigator.pop(context),
+                      text: 'close_button'.tr,
+                      gradient: AppColors.primaryGradient,
                     ),
-                  ),
+                  )
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'close_button'.tr,
-                  style: const TextStyle(color: AppColors.accent),
-                ),
-              ),
-            ],
           ),
+        ),
+      ),
     );
   }
 
@@ -387,32 +396,28 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
       return _buildDetailRow(
         icon: Icons.school_outlined,
         label: 'professors_label'.tr,
-        value: Text(
-          'no_professors_listed'.tr,
-          style: _valueTextStyle(scaleConfig),
-        ),
+        valueWidget: Text('no_professors_listed'.tr,
+            style: _valueTextStyle(scaleConfig)),
       );
     }
     return _buildDetailRow(
       icon: Icons.school_outlined,
       label: 'professors_label'.tr,
-      value: RichText(
+      valueWidget: RichText(
         text: TextSpan(
-          style: _valueTextStyle(scaleConfig),
-          children:
-              professors.map((prof) {
-                return TextSpan(
-                  text: '${prof.name}\n',
-                  style: TextStyle(
-                    color:
-                        prof.isActive
-                            ? AppColors.accent
-                            : Theme.of(context).textTheme.bodyMedium?.color,
-                    fontWeight:
-                        prof.isActive ? FontWeight.bold : FontWeight.normal,
-                  ),
-                );
-              }).toList(),
+          style: _valueTextStyle(scaleConfig,
+              color: Theme.of(context).textTheme.bodyMedium?.color),
+          children: professors.map((prof) {
+            return TextSpan(
+              text: '${prof.name}${prof.isActive ? " (Teaching)" : ""}\n',
+              style: TextStyle(
+                color: prof.isActive
+                    ? AppColors.accent
+                    : Theme.of(context).textTheme.bodyLarge?.color,
+                fontWeight: prof.isActive ? FontWeight.bold : FontWeight.normal,
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
@@ -420,35 +425,34 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
 
   Widget _buildDetailRow({
     required String label,
-    required Widget value,
+    String? value,
+    Widget? valueWidget,
     IconData? icon,
     Color? iconColor,
   }) {
-    final scaleConfig = context.scaleConfig;
+    final theme = Theme.of(context);
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: scaleConfig.scale(6)),
-      child: Card(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
-        ),
-        elevation: 0,
-        child: ListTile(
-          leading: Icon(
-            icon ?? Icons.label_important_outline,
-            color: iconColor ?? AppColors.primary,
-            size: scaleConfig.scale(22),
-          ),
-          title: Text(
-            label,
-            style: TextStyle(
-              color: Theme.of(context).textTheme.bodyMedium?.color,
-              fontSize: scaleConfig.scaleText(14),
-              fontWeight: FontWeight.w500,
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon ?? Icons.label_important_outline,
+              color: iconColor ?? AppColors.primary, size: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 4),
+                valueWidget ??
+                    Text(value ?? '',
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.w600)),
+              ],
             ),
           ),
-          subtitle: value,
-        ),
+        ],
       ),
     );
   }
@@ -464,155 +468,147 @@ class StudentSubjectsPageState extends State<StudentSubjectsPage> {
   @override
   Widget build(BuildContext context) {
     final scaleConfig = context.scaleConfig;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: lighterColor,
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: darkerColor,
-        title: Text(
-          _majorName != null
-              ? 'major_subjects_title'.trParams({'majorName': _majorName!})
-              : 'my_subjects_title'.tr,
-          style: TextStyle(
-            color: primaryTextColor,
-            fontWeight: FontWeight.bold,
-            fontSize: scaleConfig.scaleText(18),
+    final appBar = CustomAppBar(
+      useGradient: !isDarkMode,
+      title: _majorName != null
+          ? 'major_subjects_title'.trParams({'majorName': _majorName!})
+          : 'my_subjects_title'.tr,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.sort),
+          tooltip: 'sort_subjects_tooltip'.tr,
+          onPressed: _isLoading ? null : _showSortOptions,
+        ),
+        IconButton(
+          icon: const Icon(Icons.account_tree_outlined),
+          tooltip: 'view_curriculum_plan_tooltip'.tr,
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const StudentCurriculumTreePage(),
+            ),
           ),
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.sort,
-              color: AppColors.primary,
-              size: scaleConfig.scale(24),
-            ),
-            tooltip: 'sort_subjects_tooltip'.tr,
-            onPressed: _isLoading ? null : _showSortOptions,
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.account_tree_outlined,
-              color: AppColors.primary,
-              size: scaleConfig.scale(22),
-            ),
-            tooltip: 'view_curriculum_plan_tooltip'.tr,
-            onPressed:
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const StudentCurriculumTreePage(),
-                  ),
-                ),
-          ),
-        ],
-      ),
-      body: Column(
+      ],
+    );
+
+    final bodyContent = GlassLoadingOverlay(
+      isLoading: _isLoading && _subjects.isEmpty,
+      child: Column(
         children: [
           Padding(
-            padding: EdgeInsets.all(scaleConfig.scale(16)),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'search_subjects_hint'.tr,
-                hintStyle: TextStyle(color: secondaryTextColor, fontSize: 13),
-                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-                filled: true,
-                fillColor: darkerColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              style: TextStyle(color: primaryTextColor),
-            ),
+            padding: EdgeInsets.fromLTRB(scaleConfig.scale(16),
+                scaleConfig.scale(16), scaleConfig.scale(16), 0),
+            child: isDarkMode
+                ? GlassCard(
+                    child: _buildSearchField(theme),
+                    borderRadius: BorderRadius.circular(12))
+                : _buildSearchField(theme),
           ),
           Expanded(
-            child:
-                _isLoading
-                    ? const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
-                      ),
-                    )
-                    : _errorMessage != null
-                    ? Center(
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: AppColors.error),
-                      ),
-                    )
-                    : RefreshIndicator(
-                      onRefresh: _fetchStudentMajorAndSubjects,
-                      color: AppColors.primary,
-                      backgroundColor: darkerColor,
-                      child:
-                          _filteredSubjects.isEmpty
-                              ? Center(
-                                child: Text(
-                                  _searchController.text.isEmpty
-                                      ? 'no_subjects_found'.tr
-                                      : 'no_subjects_match_search'.tr,
-                                  style: TextStyle(color: secondaryTextColor),
-                                  textAlign: TextAlign.center,
+            child: _errorMessage != null
+                ? Center(
+                    child: Text(_errorMessage!,
+                        style: const TextStyle(color: AppColors.error)))
+                : RefreshIndicator(
+                    onRefresh: () =>
+                        _fetchStudentMajorAndSubjects(isRefresh: true),
+                    color: AppColors.primary,
+                    backgroundColor: theme.scaffoldBackgroundColor,
+                    child: _filteredSubjects.isEmpty && !_isLoading
+                        ? Center(
+                            child: Text(
+                              _subjects.isEmpty
+                                  ? 'no_subjects_found'.tr
+                                  : 'no_subjects_match_search'.tr,
+                              style: theme.textTheme.bodyMedium,
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: _scrollController,
+                            padding: EdgeInsets.all(scaleConfig.scale(12)),
+                            // --- PAGINATION: Adjust item count for loading indicator ---
+                            itemCount:
+                                _filteredSubjects.length + (_hasMore ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              // --- PAGINATION: Show loading indicator at the end ---
+                              if (index >= _filteredSubjects.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 20.0),
+                                  child: Center(
+                                      child: CircularProgressIndicator(
+                                          color: AppColors.primary)),
+                                );
+                              }
+                              final subject = _filteredSubjects[index];
+                              return GlassCard(
+                                margin: EdgeInsets.symmetric(
+                                    vertical: scaleConfig.scale(4)),
+                                child: ListTile(
+                                  leading: GradientIcon(
+                                      icon: Icons.book_outlined, size: 30),
+                                  title: Text(
+                                    subject['name'] ?? 'no_name_fallback'.tr,
+                                    style: theme.textTheme.bodyLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Text(
+                                    subject['code'] ?? 'no_code_fallback'.tr,
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  onTap: () =>
+                                      _showSubjectDetailsDialog(subject),
                                 ),
-                              )
-                              : ListView.builder(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: scaleConfig.scale(8),
-                                ),
-                                itemCount: _filteredSubjects.length,
-                                itemBuilder: (context, index) {
-                                  final subject = _filteredSubjects[index];
-                                  return Card(
-                                    color: darkerColor,
-                                    margin: EdgeInsets.symmetric(
-                                      vertical: scaleConfig.scale(4),
-                                      horizontal: scaleConfig.scale(8),
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      side: const BorderSide(
-                                        color: AppColors.primary,
-                                        width: 1.0,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: ListTile(
-                                      title: Text(
-                                        subject['name'] ??
-                                            'no_name_fallback'.tr,
-                                        style: TextStyle(
-                                          color: primaryTextColor,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        subject['code'] ??
-                                            'no_code_fallback'.tr,
-                                        style: TextStyle(
-                                          color: secondaryTextColor,
-                                        ),
-                                      ),
-                                      trailing: const Icon(
-                                        Icons.chevron_right,
-                                        color: AppColors.primary,
-                                      ),
-                                      onTap:
-                                          () => _showSubjectDetailsDialog(
-                                            subject,
-                                          ),
-                                    ),
-                                  );
-                                },
-                              ),
-                    ),
+                              );
+                            },
+                          ),
+                  ),
           ),
         ],
       ),
+    );
+
+    if (isDarkMode) {
+      return GradientScaffold(appBar: appBar, body: bodyContent);
+    } else {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: appBar,
+        body: bodyContent,
+      );
+    }
+  }
+
+  Widget _buildSearchField(ThemeData theme) {
+    return TextField(
+      controller: _searchController,
+      style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+      decoration: InputDecoration(
+        hintText: 'search_subjects_hint'.tr,
+        fillColor: theme.brightness == Brightness.dark
+            ? Colors.transparent
+            : theme.inputDecorationTheme.fillColor,
+        border: theme.brightness == Brightness.dark
+            ? InputBorder.none
+            : theme.inputDecorationTheme.border,
+      ).applyDefaults(theme.inputDecorationTheme).copyWith(
+            prefixIcon:
+                Icon(Icons.search, color: theme.textTheme.bodyMedium?.color),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(Icons.clear,
+                        color: theme.textTheme.bodyMedium?.color),
+                    onPressed: () {
+                      _searchController.clear();
+                    },
+                  )
+                : null,
+          ),
     );
   }
 }

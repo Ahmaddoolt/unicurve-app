@@ -1,3 +1,5 @@
+// lib/pages/auth/login/login_widgets/rember_checkbox.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
@@ -14,23 +16,42 @@ class RememberMeCheckbox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Checkbox(
-          value: value,
-          onChanged: onChanged,
-          activeColor: const Color.fromARGB(255, 0, 255, 174),
-          checkColor: Colors.black,
-          side: const BorderSide(color: AppColors.primary),
+    final theme = Theme.of(context);
+    // --- THE KEY FIX IS HERE: Make the entire row tappable ---
+    return InkWell(
+      onTap: () {
+        onChanged?.call(!value);
+      },
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // --- FIX: Styled to match the modern theme ---
+            Checkbox(
+              value: value,
+              onChanged: onChanged,
+              activeColor: AppColors.primary,
+              checkColor:
+                  Colors.white, // White check looks good on the gradient
+              side: BorderSide(
+                color: theme.textTheme.bodyMedium?.color ?? Colors.grey,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'remember_me_label'.tr,
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 2),
-        Text(
-          'remember_me_label'.tr,
-          style: TextStyle(
-            color: Theme.of(context).textTheme.bodyMedium?.color,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

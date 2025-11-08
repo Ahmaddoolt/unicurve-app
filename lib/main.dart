@@ -8,13 +8,21 @@ import 'package:unicurve/pages/initialization_screen.dart';
 import 'package:unicurve/settings/settings_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+final appHubSupabaseClientProvider = Provider<SupabaseClient>((ref) {
+  final appHubUrl = dotenv.env['APP_HUB_SUPABASE_URL'];
+  final appHubAnonKey = dotenv.env['APP_HUB_SUPABASE_ANON_KEY'];
+
+  if (appHubUrl == null || appHubAnonKey == null) {
+    throw Exception('App Hub Supabase credentials not found in .env file.');
+  }
+
+  return SupabaseClient(appHubUrl, appHubAnonKey);
+});
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Load the .env file
   await dotenv.load(fileName: ".env");
 
-  // Initialize Supabase with environment variables
   await Supabase.initialize(
     url: dotenv.env['SUPABASE_URL'] ?? '',
     anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',

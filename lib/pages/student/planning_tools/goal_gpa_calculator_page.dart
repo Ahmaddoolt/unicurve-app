@@ -1,8 +1,15 @@
+// lib/pages/student/planning_tools/goal_gpa_calculator_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_appbar.dart';
+import 'package:unicurve/core/utils/custom_button.dart';
+import 'package:unicurve/core/utils/glass_card.dart';
+import 'package:unicurve/core/utils/glass_loading_overlay.dart';
+import 'package:unicurve/core/utils/gradient_scaffold.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/pages/student/student_profile/providers/academic_profile_provider.dart';
 
@@ -73,9 +80,9 @@ class _GoalGpaCalculatorPageState extends ConsumerState<GoalGpaCalculatorPage> {
         GpaScenario(
           title: 'goal_not_possible_title'.tr,
           description: 'goal_not_possible_desc'.trParams({
-            'gpa': ((historicalPoints + maxPossibleFuturePoints) /
-                    totalMajorHours)
-                .toStringAsFixed(2),
+            'gpa':
+                ((historicalPoints + maxPossibleFuturePoints) / totalMajorHours)
+                    .toStringAsFixed(2),
           }),
           isPossible: false,
         ),
@@ -92,6 +99,7 @@ class _GoalGpaCalculatorPageState extends ConsumerState<GoalGpaCalculatorPage> {
       for (int terms = 1; terms <= 3; terms++) {
         int termHours = terms * 18;
         if (termHours > remainingHours) termHours = remainingHours;
+        if (termHours <= 0) continue;
 
         final newTotalHours = historicalHours + termHours;
         final totalPointsNeeded = targetGpa * newTotalHours;
@@ -228,127 +236,119 @@ class _GoalGpaCalculatorPageState extends ConsumerState<GoalGpaCalculatorPage> {
   Widget build(BuildContext context) {
     final scaleConfig = context.scaleConfig;
     final profileAsync = ref.watch(academicProfileProvider);
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: lighterColor,
-      appBar: AppBar(
-        title: Text('goal_gpa_calculator_title'.tr),
-        centerTitle: true,
-        backgroundColor: darkerColor,
-      ),
-      body: profileAsync.when(
-        loading:
-            () => const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
+    final appBar = CustomAppBar(
+      useGradient: !isDarkMode,
+      title: 'goal_gpa_calculator_title'.tr,
+    );
+
+    final bodyContent = GlassLoadingOverlay(
+      isLoading: profileAsync.isLoading && !profileAsync.hasValue,
+      child: profileAsync.when(
+        data: (profile) => SingleChildScrollView(
+          padding: EdgeInsets.all(scaleConfig.scale(16)),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                _buildInputCard(profile, theme, scaleConfig),
+                // const SizedBox(height: 0),
+                if (_hasCalculated)
+                  _buildResults(theme, scaleConfig)
+                else
+                  _buildInitialPrompt(theme),
+              ],
             ),
-        error:
-            (e, st) => Center(
-              child: Text(
-                'error_generic'.trParams({'error': e.toString()}),
-                style: const TextStyle(color: AppColors.error),
-              ),
-            ),
-        data:
-            (profile) => SingleChildScrollView(
-              padding: EdgeInsets.all(scaleConfig.scale(16)),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    _buildInputCard(profile),
-                    const SizedBox(height: 24),
-                    if (_hasCalculated)
-                      _buildResults()
-                    else
-                      _buildInitialPrompt(),
-                  ],
-                ),
-              ),
-            ),
+          ),
+        ),
+        loading: () => const SizedBox.shrink(),
+        error: (e, st) => Center(
+          child: Text(
+            'error_generic'.trParams({'error': e.toString()}),
+            style: const TextStyle(color: AppColors.error),
+          ),
+        ),
       ),
     );
+
+    if (isDarkMode) {
+      return GradientScaffold(appBar: appBar, body: bodyContent);
+    } else {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: appBar,
+        body: bodyContent,
+      );
+    }
   }
 
-  Widget _buildInputCard(AcademicProfile profile) {
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-
-    return Card(
-      color: darkerColor,
-      elevation: 2,
+  // --- THIS WIDGET IS COMPLETELY REDESIGNED TO MATCH THE SCREENSHOT ---
+  Widget _buildInputCard(
+      AcademicProfile profile, ThemeData theme, ScaleConfig scaleConfig) {
+    return GlassCard(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildInfoChip(
-                  'current_gpa_label'.tr,
-                  profile.cumulativeGpa.toStringAsFixed(2),
-                ),
-                _buildInfoChip(
-                  'hours_done_label'.tr,
-                  "${profile.completedHours}/${profile.totalMajorHours}",
-                ),
+                _buildInfoChip(theme, 'current_gpa_label'.tr,
+                    profile.cumulativeGpa.toStringAsFixed(2)),
+                _buildInfoChip(theme, 'hours_done_label'.tr,
+                    "${profile.completedHours}/${profile.totalMajorHours}"),
               ],
             ),
             const SizedBox(height: 20),
             TextFormField(
               controller: _gpaController,
-              style: TextStyle(
-                color: primaryTextColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
+              style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.textTheme.bodyLarge?.color),
               textAlign: TextAlign.center,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
               ],
               decoration: InputDecoration(
                 labelText: 'enter_target_gpa_label'.tr,
-                labelStyle: TextStyle(color: secondaryTextColor, fontSize: 14),
+                labelStyle: theme.textTheme.labelLarge,
+                filled: true,
+                fillColor: theme.brightness == Brightness.dark
+                    ? Colors.black.withOpacity(0.3)
+                    : AppColors.lightSurface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
                 focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: AppColors.primary),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.accent, width: 2),
                 ),
               ),
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'error_enter_gpa'.tr;
-                }
+                if (value == null || value.isEmpty) return 'error_enter_gpa'.tr;
                 final gpa = double.tryParse(value);
-                if (gpa == null || gpa <= 0 || gpa > 4.0) {
+                if (gpa == null || gpa <= 0 || gpa > 4.0)
                   return 'error_valid_gpa'.tr;
-                }
-                if (gpa <= profile.cumulativeGpa) {
+                if (gpa <= profile.cumulativeGpa)
                   return 'error_target_gpa_too_low'.tr;
-                }
                 return null;
               },
             ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: CustomButton(
                 onPressed: _calculateGpaScenarios,
-                icon: const Icon(Icons.calculate_outlined),
-                label: Text('calculate_scenarios_button'.tr),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: primaryTextColor,
-                ),
+                text: 'calculate_scenarios_button'.tr,
+                gradient: AppColors.primaryGradient,
               ),
             ),
           ],
@@ -357,26 +357,25 @@ class _GoalGpaCalculatorPageState extends ConsumerState<GoalGpaCalculatorPage> {
     );
   }
 
-  Widget _buildInfoChip(String label, String value) {
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-    Color? lighterColor = Theme.of(context).cardColor;
-
+  // --- THIS WIDGET IS UPDATED TO MATCH THE SCREENSHOT'S STYLE ---
+  Widget _buildInfoChip(ThemeData theme, String label, String value) {
     return Column(
       children: [
-        Text(label, style: TextStyle(color: secondaryTextColor, fontSize: 12)),
+        Text(label, style: theme.textTheme.labelLarge),
         const SizedBox(height: 4),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: lighterColor,
-            borderRadius: BorderRadius.circular(20),
+            color: theme.brightness == Brightness.dark
+                ? Colors.black.withOpacity(0.25)
+                : AppColors.lightSurface,
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             value,
-            style: const TextStyle(
+            style: theme.textTheme.titleMedium?.copyWith(
               color: AppColors.primary,
               fontWeight: FontWeight.bold,
-              fontSize: 16,
             ),
           ),
         ),
@@ -384,38 +383,24 @@ class _GoalGpaCalculatorPageState extends ConsumerState<GoalGpaCalculatorPage> {
     );
   }
 
-  Widget _buildInitialPrompt() {
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-
+  Widget _buildInitialPrompt(ThemeData theme) {
     return Column(
       children: [
-        Icon(Icons.insights, size: 80, color: secondaryTextColor),
+        Icon(Icons.insights,
+            size: 80, color: theme.textTheme.bodyMedium?.color),
         const SizedBox(height: 16),
-        Text(
-          'goal_prompt_title'.tr,
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: primaryTextColor,
-          ),
-        ),
+        Text('goal_prompt_title'.tr, style: theme.textTheme.headlineSmall),
         const SizedBox(height: 8),
         Text(
           'goal_prompt_desc'.tr,
           textAlign: TextAlign.center,
-          style: TextStyle(color: secondaryTextColor, fontSize: 16),
+          style: theme.textTheme.bodyLarge,
         ),
       ],
     );
   }
 
-  Widget _buildResults() {
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-
+  Widget _buildResults(ThemeData theme, ScaleConfig scaleConfig) {
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -423,19 +408,7 @@ class _GoalGpaCalculatorPageState extends ConsumerState<GoalGpaCalculatorPage> {
       separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
         final scenario = _scenarios[index];
-        return Card(
-          color: darkerColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color:
-                  scenario.isPossible
-                      // ignore: deprecated_member_use
-                      ? AppColors.accent.withOpacity(0.5)
-                      // ignore: deprecated_member_use
-                      : AppColors.error.withOpacity(0.5),
-            ),
-          ),
+        return GlassCard(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -443,20 +416,14 @@ class _GoalGpaCalculatorPageState extends ConsumerState<GoalGpaCalculatorPage> {
               children: [
                 Text(
                   scenario.title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color:
-                        scenario.isPossible
-                            ? AppColors.accent
-                            : AppColors.error,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: scenario.isPossible
+                        ? AppColors.accent
+                        : AppColors.error,
                   ),
                 ),
-                Divider(height: 20, color: lighterColor),
-                Text(
-                  scenario.description,
-                  style: TextStyle(color: secondaryTextColor, height: 1.5),
-                ),
+                Divider(height: 20, color: theme.dividerColor),
+                Text(scenario.description, style: theme.textTheme.bodyMedium),
                 if (scenario.termGpas.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Wrap(
@@ -470,18 +437,14 @@ class _GoalGpaCalculatorPageState extends ConsumerState<GoalGpaCalculatorPage> {
                           child: Text(
                             "${i + 1}",
                             style: TextStyle(
-                              color: primaryTextColor,
+                              color: theme.textTheme.bodyLarge?.color,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
-                        label: Text(
-                          'gpa_chip_label'.trParams({
-                            'gpa': scenario.termGpas[i],
-                          }),
-                        ),
-                        // ignore: deprecated_member_use
+                        label: Text('gpa_chip_label'
+                            .trParams({'gpa': scenario.termGpas[i]})),
                         backgroundColor: AppColors.primary.withOpacity(0.2),
                         labelStyle: const TextStyle(
                           color: AppColors.primary,

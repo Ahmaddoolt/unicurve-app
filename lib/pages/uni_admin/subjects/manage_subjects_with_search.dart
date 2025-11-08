@@ -1,40 +1,76 @@
+// lib/pages/uni_admin/subjects/manage_subjects_with_search.dart
+
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_appbar.dart';
+import 'package:unicurve/core/utils/custom_button.dart';
 import 'package:unicurve/core/utils/custom_floadt_action_button.dart';
 import 'package:unicurve/core/utils/custom_snackbar.dart';
+import 'package:unicurve/core/utils/glass_card.dart';
+import 'package:unicurve/core/utils/gradient_icon.dart';
+import 'package:unicurve/core/utils/gradient_scaffold.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
+// --- NEW: Import the reusable overlay widget ---
+import 'package:unicurve/core/utils/glass_loading_overlay.dart';
 import 'package:unicurve/pages/uni_admin/subjects/add_subject.dart';
+import 'package:unicurve/pages/uni_admin/subjects/edit_subject_dialog.dart';
 import 'package:unicurve/pages/uni_admin/subjects/subjects_relationships/manage_subjects_relationships.dart'
     as rel_manager;
-import 'package:unicurve/pages/uni_admin/subjects/subjects_list_for_search_page.dart';
 
-class SearchSubjectsPage extends StatefulWidget {
+final subjectsAndRequirementsProvider = FutureProvider.autoDispose
+    .family<Map<String, dynamic>, int>((ref, majorId) async {
+  final supabase = Supabase.instance.client;
+  final subjectsFuture = supabase
+      .from('subjects')
+      .select('*, subject_professors(professors(name))')
+      .eq('major_id', majorId)
+      .order('name', ascending: true);
+
+  final requirementsFuture = supabase
+      .from('major_requirements')
+      .select('id, requirement_name')
+      .eq('major_id', majorId);
+
+  final majorFuture = supabase
+      .from('majors')
+      .select('name, university_id')
+      .eq('id', majorId)
+      .single();
+
+  final results =
+      await Future.wait([subjectsFuture, requirementsFuture, majorFuture]);
+
+  final subjects = List<Map<String, dynamic>>.from(results[0] as List);
+  final requirementsResponse = results[1] as List;
+  final majorResponse = results[2] as Map;
+
+  final requirementsMap = {
+    for (var req in requirementsResponse)
+      (req['id'] as int): req['requirement_name'] as String,
+  };
+
+  return {
+    'subjects': subjects,
+    'requirementsMap': requirementsMap,
+    'majorName': majorResponse['name'],
+    'universityId': majorResponse['university_id'],
+  };
+});
+
+class SearchSubjectsPage extends ConsumerStatefulWidget {
   final int majorId;
   const SearchSubjectsPage({super.key, required this.majorId});
 
   @override
-  SearchSubjectsPageState createState() => SearchSubjectsPageState();
+  ConsumerState<SearchSubjectsPage> createState() => _SearchSubjectsPageState();
 }
 
-class SearchSubjectsPageState extends State<SearchSubjectsPage> {
-  final supabase = Supabase.instance.client;
-  Future<List<dynamic>>? _dataFutures;
-  List<Map<String, dynamic>> _allSubjects = [];
-  List<Map<String, dynamic>> _filteredSubjects = [];
+class _SearchSubjectsPageState extends ConsumerState<SearchSubjectsPage> {
   final TextEditingController _searchController = TextEditingController();
-  String? _majorName;
-  bool _isLoading = false;
-
-  int? _universityId;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchAllData();
-    _searchController.addListener(_filterSubjects);
-  }
 
   @override
   void dispose() {
@@ -42,316 +78,288 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
     super.dispose();
   }
 
-  Future<void> _fetchAllData() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final majorResponse =
-          await supabase
-              .from('majors')
-              .select('name, university_id')
-              .eq('id', widget.majorId)
-              .single();
+  void _filterListener() => setState(() {});
 
-      if (mounted) {
-        setState(() {
-          _majorName = majorResponse['name'];
-          _universityId = majorResponse['university_id'];
-          _dataFutures = Future.wait([
-            _fetchSubjectsAndProfessors(),
-            _fetchRequirementsMap(),
-          ]);
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        showFeedbackSnackbar(context, 'error_wifi'.tr, isError: true);
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_filterListener);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scaleConfig = context.scaleConfig;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final subjectsDataAsync =
+        ref.watch(subjectsAndRequirementsProvider(widget.majorId));
+
+    final data = subjectsDataAsync.valueOrNull;
+    final allSubjects = data?['subjects'] as List<Map<String, dynamic>>? ?? [];
+    final requirementsMap = data?['requirementsMap'] as Map<int, String>? ?? {};
+    final majorName = data?['majorName'] as String? ?? '...';
+    final universityId = data?['universityId'] as int?;
+
+    final query = _searchController.text.toLowerCase();
+    final filteredSubjects = allSubjects.where((subject) {
+      final nameMatch =
+          subject['name'].toString().toLowerCase().contains(query);
+      final codeMatch =
+          subject['code'].toString().toLowerCase().contains(query);
+      return nameMatch || codeMatch;
+    }).toList();
+
+    final appBar = CustomAppBar(
+      useGradient: !isDarkMode,
+      title: majorName,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.lan_outlined),
+          tooltip: 'manage_relationships_tooltip'.tr,
+          onPressed: () {
+            if (universityId != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      rel_manager.ManageSubjectsRelationshipsPage(
+                    subjects: allSubjects,
+                    universityId: universityId,
+                    majorId: widget.majorId,
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+      ],
+    );
+
+    // --- THE KEY CHANGE: Using the new GlassLoadingOverlay widget ---
+    final bodyContent = GlassLoadingOverlay(
+      isLoading: subjectsDataAsync.isLoading && !subjectsDataAsync.hasValue,
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(scaleConfig.scale(16),
+                scaleConfig.scale(16), scaleConfig.scale(16), 0),
+            child: isDarkMode
+                ? GlassCard(
+                    borderRadius: BorderRadius.circular(12),
+                    child: _buildSearchField(theme),
+                  )
+                : _buildSearchField(theme),
+          ),
+          Expanded(
+            child: subjectsDataAsync.when(
+              data: (_) {
+                if (filteredSubjects.isEmpty && allSubjects.isNotEmpty) {
+                  return Center(
+                    child: Text(
+                      'manage_subjects_no_match_search'.tr,
+                      style:
+                          TextStyle(color: theme.textTheme.bodyMedium?.color),
+                    ),
+                  );
+                }
+                if (allSubjects.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'manage_subjects_no_subjects_found'.tr,
+                      style:
+                          TextStyle(color: theme.textTheme.bodyMedium?.color),
+                    ),
+                  );
+                }
+                return RefreshIndicator(
+                  onRefresh: () => ref.refresh(
+                      subjectsAndRequirementsProvider(widget.majorId).future),
+                  child: ListView.builder(
+                    padding: EdgeInsets.all(scaleConfig.scale(16)),
+                    itemCount: filteredSubjects.length,
+                    itemBuilder: (context, index) {
+                      final subject = filteredSubjects[index];
+                      return _SubjectListTile(
+                        subject: subject,
+                        onTap: () =>
+                            _showSubjectDetailsDialog(subject, requirementsMap),
+                        onEdit: () => _editSubject(subject, requirementsMap),
+                        onDelete: () => _deleteSubject(subject),
+                      );
+                    },
+                  ),
+                );
+              },
+              loading: () => const SizedBox.shrink(), // Keep UI static
+              error: (err, stack) => Center(
+                child:
+                    Text('error_generic'.trParams({'error': err.toString()})),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (isDarkMode) {
+      return GradientScaffold(
+        appBar: appBar,
+        body: bodyContent,
+        floatingActionButton: _buildFAB(context, ref),
+      );
+    } else {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: appBar,
+        body: bodyContent,
+        floatingActionButton: _buildFAB(context, ref),
+      );
     }
   }
 
-  Future<List<Map<String, dynamic>>> _fetchSubjectsAndProfessors() async {
-    final response = await supabase
-        .from('subjects')
-        .select(
-          'id, name, code, hours, description, is_open, major_id, level, type, subject_professors(professors(name))',
-        )
-        .eq('major_id', widget.majorId)
-        .order('name', ascending: true);
-
-    _allSubjects = List<Map<String, dynamic>>.from(response);
-    _filteredSubjects = _allSubjects;
-    return _allSubjects;
+  Widget _buildFAB(BuildContext context, WidgetRef ref) {
+    return CustomFAB(
+      onPressed: () async {
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (context) => const AddSubjectBasicPage()),
+        );
+        if (result == true) {
+          ref.invalidate(subjectsAndRequirementsProvider(widget.majorId));
+        }
+      },
+    );
   }
 
-  Future<Map<int, String>> _fetchRequirementsMap() async {
-    final response = await supabase
-        .from('major_requirements')
-        .select('id, requirement_name')
-        .eq('major_id', widget.majorId);
-    return {
-      for (var req in response)
-        (req['id'] as int): req['requirement_name'] as String,
-    };
-  }
-
-  void _filterSubjects() {
-    final query = _searchController.text.toLowerCase();
-    setState(() {
-      _filteredSubjects =
-          _allSubjects.where((subject) {
-            final nameMatch = subject['name'].toString().toLowerCase().contains(
-              query,
-            );
-            final codeMatch = subject['code'].toString().toLowerCase().contains(
-              query,
-            );
-            final professorsList =
-                (subject['subject_professors'] as List?) ?? [];
-            final professorMatch = professorsList.any((profLink) {
-              final prof = profLink['professors'];
-              return prof != null &&
-                  prof['name'].toString().toLowerCase().contains(query);
-            });
-            return nameMatch || codeMatch || professorMatch;
-          }).toList();
-    });
+  Widget _buildSearchField(ThemeData theme) {
+    return TextField(
+      controller: _searchController,
+      style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+      decoration: InputDecoration(
+        hintText: 'search_subjects_hint'.tr,
+        fillColor: theme.brightness == Brightness.dark
+            ? Colors.transparent
+            : theme.inputDecorationTheme.fillColor,
+        border: theme.brightness == Brightness.dark
+            ? InputBorder.none
+            : theme.inputDecorationTheme.border,
+        enabledBorder: theme.brightness == Brightness.dark
+            ? InputBorder.none
+            : theme.inputDecorationTheme.enabledBorder,
+        focusedBorder: theme.brightness == Brightness.dark
+            ? InputBorder.none
+            : theme.inputDecorationTheme.focusedBorder,
+      ).applyDefaults(theme.inputDecorationTheme).copyWith(
+            prefixIcon:
+                Icon(Icons.search, color: theme.textTheme.bodyMedium?.color),
+            suffixIcon: _searchController.text.isNotEmpty
+                ? IconButton(
+                    icon: Icon(Icons.clear,
+                        color: theme.textTheme.bodyMedium?.color),
+                    onPressed: () => _searchController.clear(),
+                  )
+                : null,
+          ),
+    );
   }
 
   Future<void> _deleteSubject(Map<String, dynamic> subject) async {
     final int? subjectId = subject['id'];
     if (subjectId == null) {
-      showFeedbackSnackbar(
-        context,
-        'delete_subject_error_invalid'.tr,
-        isError: true,
-      );
+      showFeedbackSnackbar(context, 'delete_subject_error_invalid'.tr,
+          isError: true);
       return;
     }
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-
     final bool? confirm = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            backgroundColor: lighterColor,
-            title: Text(
-              'manage_subjects_delete_title'.tr,
-              style: TextStyle(color: primaryTextColor),
-            ),
-            content: Text(
-              'delete_subject_confirm'.trParams({'name': subject['name']}),
-              style: TextStyle(color: secondaryTextColor),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: Text(
-                  'cancel'.tr,
-                  style: const TextStyle(color: AppColors.accent),
-                ),
+      builder: (context) {
+        final theme = Theme.of(context);
+        return AlertDialog(
+          backgroundColor: theme.brightness == Brightness.dark
+              ? Colors.transparent
+              : theme.cardColor,
+          elevation: 0,
+          contentPadding: EdgeInsets.zero,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: GlassCard(
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('manage_subjects_delete_title'.tr,
+                      style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 16),
+                  Text(
+                      'delete_subject_confirm'
+                          .trParams({'name': subject['name']}),
+                      style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: Text('cancel'.tr),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: Text('delete_button'.tr,
+                            style: const TextStyle(color: AppColors.error)),
+                      ),
+                    ],
+                  )
+                ],
               ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: Text(
-                  'delete_button'.tr,
-                  style: const TextStyle(color: AppColors.error),
-                ),
-              ),
-            ],
+            ),
           ),
+        );
+      },
     );
 
     if (confirm != true) return;
-    if (mounted) setState(() => _isLoading = true);
+
     try {
+      final supabase = Supabase.instance.client;
       await supabase
           .from('subject_professors')
           .delete()
           .eq('subject_id', subjectId);
-      await supabase
-          .from('subject_relationships')
-          .delete()
-          .or(
-            'source_subject_id.eq.$subjectId,target_subject_id.eq.$subjectId',
-          );
+      await supabase.from('subject_relationships').delete().or(
+          'source_subject_id.eq.$subjectId,target_subject_id.eq.$subjectId');
       await supabase.from('subjects').delete().eq('id', subjectId);
 
       if (mounted) {
         showFeedbackSnackbar(context, 'manage_subjects_delete_success'.tr);
+        ref.invalidate(subjectsAndRequirementsProvider(widget.majorId));
       }
-      await _fetchAllData();
     } catch (e) {
       if (mounted) {
         showFeedbackSnackbar(context, 'error_wifi'.tr, isError: true);
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _editSubject(
-    Map<String, dynamic> subject,
-    Map<int, String> requirementsMap,
-  ) async {
-    final scaleConfig = context.scaleConfig;
-    final nameController = TextEditingController(text: subject['name']);
-    final codeController = TextEditingController(text: subject['code']);
-    final hoursController = TextEditingController(
-      text: subject['hours'].toString(),
-    );
-    final descriptionController = TextEditingController(
-      text: subject['description'],
-    );
-    bool isOpen = subject['is_open'] ?? false;
-    int? typeId = subject['type'];
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-
-    await showDialog(
+      Map<String, dynamic> subject, Map<int, String> requirementsMap) async {
+    final updatedSubject = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder:
-          (context) => StatefulBuilder(
-            builder:
-                (context, setDialogState) => AlertDialog(
-                  backgroundColor: lighterColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
-                  ),
-                  title: Text(
-                    'edit_subject_dialog_title'.tr,
-                    style: TextStyle(
-                      color: primaryTextColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: scaleConfig.scaleText(18),
-                    ),
-                  ),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextField(
-                          controller: nameController,
-                          decoration: InputDecoration(
-                            labelText: 'add_subject_name_label'.tr,
-                          ),
-                          style: TextStyle(color: primaryTextColor),
-                        ),
-                        TextField(
-                          controller: codeController,
-                          decoration: InputDecoration(
-                            labelText: 'add_subject_code_label'.tr,
-                          ),
-                          style: TextStyle(color: primaryTextColor),
-                        ),
-                        TextField(
-                          controller: hoursController,
-                          decoration: InputDecoration(
-                            labelText: 'add_subject_hours_label'.tr,
-                          ),
-                          keyboardType: TextInputType.number,
-                          style: TextStyle(color: primaryTextColor),
-                        ),
-                        TextField(
-                          controller: descriptionController,
-                          decoration: InputDecoration(
-                            labelText: 'add_subject_desc_label'.tr,
-                          ),
-                          maxLines: 3,
-                          style: TextStyle(color: primaryTextColor),
-                        ),
-                        DropdownButtonFormField<int>(
-                          value: typeId,
-                          items:
-                              requirementsMap.entries
-                                  .map(
-                                    (entry) => DropdownMenuItem<int>(
-                                      value: entry.key,
-                                      child: Text(entry.value),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged:
-                              (value) => setDialogState(() => typeId = value),
-                          decoration: InputDecoration(
-                            labelText: 'add_subject_req_type_label'.tr,
-                          ),
-                          dropdownColor: darkerColor,
-                          style: TextStyle(color: primaryTextColor),
-                        ),
-                        CheckboxListTile(
-                          title: Text(
-                            'add_subject_is_open_label'.tr,
-                            style: TextStyle(color: primaryTextColor),
-                          ),
-                          value: isOpen,
-                          onChanged:
-                              (value) =>
-                                  setDialogState(() => isOpen = value ?? false),
-                          activeColor: AppColors.accent,
-                        ),
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        'cancel'.tr,
-                        style: const TextStyle(color: AppColors.accent),
-                      ),
-                    ),
-                    ElevatedButton(
-                      onPressed: () async {
-                        try {
-                          await supabase
-                              .from('subjects')
-                              .update({
-                                'name': nameController.text,
-                                'code': codeController.text,
-                                'hours':
-                                    int.tryParse(hoursController.text) ?? 0,
-                                'description': descriptionController.text,
-                                'is_open': isOpen,
-                                'type': typeId,
-                              })
-                              .eq('id', subject['id']);
-                          if (mounted) {
-                            // ignore: use_build_context_synchronously
-                            Navigator.pop(context);
-                            showFeedbackSnackbar(
-                              // ignore: use_build_context_synchronously
-                              context,
-                              'manage_subjects_update_success'.tr,
-                            );
-                            await _fetchAllData();
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            showFeedbackSnackbar(
-                              // ignore: use_build_context_synchronously
-                              context,
-                              'edit_subject_error_update'.trParams({
-                                'error': e.toString(),
-                              }),
-                              isError: true,
-                            );
-                            // ignore: use_build_context_synchronously
-                            Navigator.pop(context);
-                          }
-                        }
-                      },
-                      child: Text('save_button'.tr),
-                    ),
-                  ],
-                ),
-          ),
+      builder: (context) => EditSubjectDialog(
+        subject: subject,
+        requirementsMap: requirementsMap,
+        onSuccess: (updatedData) {
+          Navigator.of(context).pop(updatedData);
+        },
+      ),
     );
+
+    if (updatedSubject != null && mounted) {
+      showFeedbackSnackbar(context, 'manage_subjects_update_success'.tr);
+      ref.invalidate(subjectsAndRequirementsProvider(widget.majorId));
+    }
   }
 
   void _showSubjectDetailsDialog(
@@ -359,287 +367,186 @@ class SearchSubjectsPageState extends State<SearchSubjectsPage> {
     Map<int, String> requirementsMap,
   ) {
     final scaleConfig = context.scaleConfig;
+    final theme = Theme.of(context);
     final String typeName =
         requirementsMap[subject['type']] ?? 'uncategorized_label'.tr;
     final List<dynamic> professorLinks = subject['subject_professors'] ?? [];
-    final List<String> professorNames =
-        professorLinks
-            .map((link) => link['professors']['name'] as String)
-            .toList();
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final List<String> professorNames = professorLinks
+        .map((link) => link['professors']?['name'] as String? ?? '')
+        .where((name) => name.isNotEmpty)
+        .toList();
 
     showDialog(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            backgroundColor: darkerColor,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(scaleConfig.scale(16)),
-              side: const BorderSide(color: AppColors.primaryDark, width: 1.5),
-            ),
-            title: Text(
-              subject['name']?.toString() ?? 'unknown_subject'.tr,
-              style: TextStyle(
-                color: primaryTextColor,
-                fontWeight: FontWeight.bold,
-                fontSize: scaleConfig.scaleText(20),
-              ),
-            ),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: ListView(
-                shrinkWrap: true,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.brightness == Brightness.dark
+            ? Colors.transparent
+            : theme.cardColor,
+        elevation: 0,
+        contentPadding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: GlassCard(
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildDetailRow(
-                    label: 'code_label'.tr,
-                    value: subject['code']?.toString() ?? 'not_available'.tr,
-                    icon: Icons.code,
-                    scaleConfig: scaleConfig,
+                  Text(
+                    subject['name']?.toString() ?? 'unknown_subject'.tr,
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontSize: scaleConfig.scaleText(20)),
                   ),
+                  const SizedBox(height: 16),
                   _buildDetailRow(
-                    label: 'add_subject_hours_label'.tr,
-                    value: 'hours_label'.trParams({
-                      'hours': '${subject['hours'] ?? 0}',
-                    }),
-                    icon: Icons.access_time,
-                    scaleConfig: scaleConfig,
-                  ),
+                      label: 'code_label'.tr,
+                      value: subject['code']?.toString() ?? 'N/A',
+                      icon: Icons.code),
                   _buildDetailRow(
-                    label: 'level_label'.tr,
-                    value: subject['level']?.toString() ?? 'not_available'.tr,
-                    icon: Icons.trending_up,
-                    scaleConfig: scaleConfig,
-                  ),
+                      label: 'add_subject_hours_label'.tr,
+                      value: 'hours_label'
+                          .trParams({'hours': '${subject['hours'] ?? 0}'}),
+                      icon: Icons.access_time),
                   _buildDetailRow(
-                    label: 'type_label'.tr,
-                    value: typeName,
-                    icon: Icons.category,
-                    scaleConfig: scaleConfig,
-                  ),
+                      label: 'level_label'.tr,
+                      value: subject['level']?.toString() ?? 'N/A',
+                      icon: Icons.trending_up),
                   _buildDetailRow(
-                    label: 'open_for_reg_label'.tr,
-                    value: subject['is_open'] == true ? 'yes'.tr : 'no'.tr,
-                    icon:
-                        subject['is_open'] == true
-                            ? Icons.check_circle
-                            : Icons.cancel,
-                    iconColor:
-                        subject['is_open'] == true
-                            ? AppColors.primary
-                            : AppColors.error,
-                    scaleConfig: scaleConfig,
-                  ),
+                      label: 'type_label'.tr,
+                      value: typeName,
+                      icon: Icons.category),
                   _buildDetailRow(
-                    label: 'description_label'.tr,
-                    value:
-                        subject['description']?.toString() ??
-                        'no_description_provided'.tr,
-                    icon: Icons.description,
-                    isMultiLine: true,
-                    scaleConfig: scaleConfig,
-                  ),
+                      label: 'open_for_reg_label'.tr,
+                      value: subject['is_open'] == true ? 'yes'.tr : 'no'.tr,
+                      icon: subject['is_open'] == true
+                          ? Icons.check_circle_outline
+                          : Icons.highlight_off,
+                      iconColor: subject['is_open'] == true
+                          ? AppColors.primary
+                          : AppColors.error),
                   _buildDetailRow(
-                    label: 'professors_label'.tr,
-                    value:
-                        professorNames.isNotEmpty
-                            ? professorNames.join(', ')
-                            : 'no_professors_listed'.tr,
-                    icon: Icons.person_search,
-                    isMultiLine: true,
-                    scaleConfig: scaleConfig,
-                  ),
+                      label: 'description_label'.tr,
+                      value: subject['description']?.toString() ??
+                          'no_description_provided'.tr,
+                      icon: Icons.description_outlined),
+                  _buildDetailRow(
+                      label: 'professors_label'.tr,
+                      value: professorNames.isNotEmpty
+                          ? professorNames.join(', ')
+                          : 'no_professors_listed'.tr,
+                      icon: Icons.person_search_outlined),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: CustomButton(
+                      onPressed: () => Navigator.pop(context),
+                      text: 'close_button'.tr,
+                      gradient: AppColors.primaryGradient,
+                    ),
+                  )
                 ],
               ),
             ),
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                ),
-                child: Text(
-                  'close_button'.tr,
-                  style: TextStyle(
-                    color: darkerColor,
-                    fontSize: scaleConfig.scaleText(14),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-    );
-  }
-
-  Widget _buildDetailRow({
-    required String label,
-    required String value,
-    required IconData icon,
-    required ScaleConfig scaleConfig,
-    bool isMultiLine = false,
-    Color? iconColor,
-  }) {
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
-
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: scaleConfig.scale(8)),
-      child: Card(
-        color: lighterColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
-          // ignore: deprecated_member_use
-          side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
-        ),
-        child: ListTile(
-          leading: Icon(
-            icon,
-            color: iconColor ?? AppColors.primary,
-            size: scaleConfig.scale(20),
-          ),
-          title: Text(
-            label,
-            style: TextStyle(
-              color: secondaryTextColor,
-              fontSize: scaleConfig.scaleText(15),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          subtitle: Text(
-            value,
-            style: TextStyle(
-              color: primaryTextColor,
-              fontSize: scaleConfig.scaleText(15),
-              fontWeight: FontWeight.w600,
-            ),
           ),
         ),
       ),
     );
   }
+
+  Widget _buildDetailRow(
+      {required String label,
+      required String value,
+      required IconData icon,
+      Color? iconColor}) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: iconColor ?? AppColors.primary, size: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: theme.textTheme.bodyMedium),
+                const SizedBox(height: 4),
+                Text(value,
+                    style: theme.textTheme.bodyLarge
+                        ?.copyWith(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubjectListTile extends StatelessWidget {
+  final Map<String, dynamic> subject;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _SubjectListTile({
+    required this.subject,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final scaleConfig = context.scaleConfig;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
 
-    return Scaffold(
-      floatingActionButton: CustomFAB(
-        onPressed: () async {
-          final result = await Navigator.push<bool>(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const AddSubjectBasicPage(),
-            ),
-          );
-          if (result == true) {
-            await _fetchAllData();
-          }
-        },
-      ),
-      backgroundColor: lighterColor,
-      appBar: AppBar(
-        centerTitle: true,
-        backgroundColor: darkerColor,
+    return GlassCard(
+      margin: EdgeInsets.only(bottom: scaleConfig.scale(12)),
+      borderRadius: BorderRadius.circular(12),
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: EdgeInsets.only(
+            left: scaleConfig.scale(16),
+            top: scaleConfig.scale(8),
+            bottom: scaleConfig.scale(8),
+            right: scaleConfig.scale(4)),
+        leading: GradientIcon(
+          icon: Icons.book_outlined,
+          size: scaleConfig.scale(30),
+        ),
         title: Text(
-          _majorName ?? 'admin_manage_subjects'.tr,
-          style: TextStyle(
-            color: primaryTextColor,
-            fontWeight: FontWeight.bold,
-            fontSize: scaleConfig.scaleText(18),
-          ),
+          subject['name'],
+          style:
+              theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.lan_outlined, color: AppColors.primary),
-            onPressed:
-                (_universityId == null || _isLoading)
-                    ? null
-                    : () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder:
-                            (context) =>
-                                rel_manager.ManageSubjectsRelationshipsPage(
-                                  subjects: _allSubjects,
-                                  universityId: _universityId!,
-                                  majorId: widget.majorId,
-                                ),
-                      ),
-                    ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: EdgeInsets.all(scaleConfig.scale(16)),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'search_subjects_hint'.tr,
-                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-                filled: true,
-                fillColor: darkerColor,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(scaleConfig.scale(12)),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              style: TextStyle(color: primaryTextColor),
+        subtitle: Text(
+          '${subject['code']} - ${'hours_label'.trParams({
+                'hours': subject['hours'].toString()
+              })}',
+          style: theme.textTheme.bodyMedium,
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(Icons.edit_outlined,
+                  color: theme.textTheme.bodyMedium?.color),
+              tooltip: 'edit_subject_dialog_title'.tr,
+              onPressed: onEdit,
             ),
-          ),
-          Expanded(
-            child: FutureBuilder(
-              future: _dataFutures,
-              builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting ||
-                    _isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
-                }
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'error_generic'.trParams({
-                        'error': snapshot.error.toString(),
-                      }),
-                      style: const TextStyle(color: AppColors.error),
-                    ),
-                  );
-                }
-                if (!snapshot.hasData ||
-                    snapshot.data == null ||
-                    snapshot.data!.isEmpty ||
-                    (snapshot.data![0] as List).isEmpty) {
-                  return Center(
-                    child: Text(
-                      'no_data_found'.tr,
-                      style: TextStyle(color: secondaryTextColor),
-                    ),
-                  );
-                }
-                final requirementsMap = snapshot.data![1] as Map<int, String>;
-                return SubjectsListBuilder(
-                  subjects: _filteredSubjects,
-                  onSubjectTap:
-                      (subject) =>
-                          _showSubjectDetailsDialog(subject, requirementsMap),
-                  onEditSubject:
-                      (subject) => _editSubject(subject, requirementsMap),
-                  onDeleteSubject: _deleteSubject,
-                );
-              },
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              tooltip: 'manage_subjects_delete_title'.tr,
+              onPressed: onDelete,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -1,8 +1,15 @@
+// lib/pages/uni_admin/select_major_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:get/get.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_appbar.dart';
 import 'package:unicurve/core/utils/custom_snackbar.dart';
+import 'package:unicurve/core/utils/glass_card.dart';
+import 'package:unicurve/core/utils/glass_loading_overlay.dart'; // --- FIX: Import the overlay ---
+import 'package:unicurve/core/utils/gradient_icon.dart';
+import 'package:unicurve/core/utils/gradient_scaffold.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/pages/uni_admin/professors/views/professors_page.dart';
 import 'package:unicurve/pages/uni_admin/providers/admin_university_provider.dart';
@@ -17,277 +24,197 @@ class SelectMajorPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scaleConfig = ScaleConfig(context);
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final scaleConfig = context.scaleConfig;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: lighterColor,
-      appBar: AppBar(
-        backgroundColor: darkerColor,
-        centerTitle: true,
-        title: Text(
-          'select_major_page_title'.tr,
-          style: TextStyle(
-            color: primaryTextColor,
-            fontWeight: FontWeight.bold,
-            fontSize: scaleConfig.scaleText(20),
-            letterSpacing: 0.5,
-          ),
-        ),
-      ),
-      body: Consumer(
-        builder: (context, ref, child) {
-          final adminUniversityAsync = ref.watch(adminUniversityProvider);
+    final appBar = CustomAppBar(
+      useGradient: !isDarkMode, // Corrected logic for consistency
+      title: 'select_major_page_title'.tr,
+    );
 
-          return adminUniversityAsync.when(
-            data: (adminUniversity) {
-              if (adminUniversity == null) {
-                return Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(scaleConfig.scale(16)),
-                    child: Text(
-                      'error_no_university_assigned'.tr,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: secondaryTextColor,
-                        fontSize: scaleConfig.scaleText(16),
-                      ),
-                    ),
-                  ),
+    final adminUniversityAsync = ref.watch(adminUniversityProvider);
+
+    // This nested provider watch depends on the first one completing.
+    // We get the universityId safely before watching the majorsProvider.
+    final universityId =
+        adminUniversityAsync.valueOrNull?['university_id'] as int?;
+    final majorsAsync = ref.watch(majorsProvider(
+        universityId ?? -1)); // Use -1 as a placeholder if no ID yet
+
+    final bodyContent = GlassLoadingOverlay(
+      isLoading:
+          (adminUniversityAsync.isLoading && !adminUniversityAsync.hasValue) ||
+              (majorsAsync.isLoading && !majorsAsync.hasValue),
+      child: adminUniversityAsync.when(
+        data: (adminUniversity) {
+          if (adminUniversity == null) {
+            return _buildErrorState(
+              context,
+              scaleConfig,
+              'error_no_university_assigned'.tr,
+            );
+          }
+          // Now we can safely use the majorsAsync provider's states
+          return majorsAsync.when(
+            data: (majors) {
+              if (majors.isEmpty) {
+                return _buildErrorState(
+                  context,
+                  scaleConfig,
+                  'error_no_majors_found'.tr,
+                  icon: Icons.search_off_rounded,
                 );
               }
-
-              final universityId = adminUniversity['university_id'] as int;
-              final majorsAsync = ref.watch(majorsProvider(universityId));
-
-              return Stack(
-                children: [
-                  majorsAsync.when(
-                    data:
-                        (majors) =>
-                            majors.isEmpty
-                                ? Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(
-                                      scaleConfig.scale(16),
-                                    ),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.info,
-                                          color: secondaryTextColor,
-                                          size: scaleConfig.scale(40),
-                                        ),
-                                        SizedBox(height: scaleConfig.scale(16)),
-                                        Text(
-                                          'error_no_majors_found'.tr,
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: secondaryTextColor,
-                                            fontSize: scaleConfig.scaleText(16),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                                : RefreshIndicator(
-                                  onRefresh: () async {
-                                    ref.invalidate(
-                                      majorsProvider(universityId),
-                                    );
-                                  },
-                                  child: ListView.builder(
-                                    padding: EdgeInsets.all(
-                                      scaleConfig.scale(16),
-                                    ),
-                                    itemCount: majors.length,
-                                    itemBuilder: (context, index) {
-                                      final major = majors[index];
-                                      return AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds: 200,
-                                        ),
-                                        margin: EdgeInsets.symmetric(
-                                          vertical: scaleConfig.scale(6),
-                                        ),
-                                        child: Card(
-                                          elevation: 2,
-                                          color: darkerColor,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              scaleConfig.scale(8),
-                                            ),
-                                            side: const BorderSide(
-                                              color: AppColors.primary,
-                                              width: 1.5,
-                                            ),
-                                          ),
-                                          child: ListTile(
-                                            contentPadding:
-                                                EdgeInsets.symmetric(
-                                                  horizontal: scaleConfig.scale(
-                                                    16,
-                                                  ),
-                                                  vertical: scaleConfig.scale(
-                                                    12,
-                                                  ),
-                                                ),
-                                            leading: CircleAvatar(
-                                              radius: scaleConfig.scale(20),
-                                              backgroundColor: lighterColor,
-                                              child: Icon(
-                                                Icons.school,
-                                                color: AppColors.primary,
-                                                size: scaleConfig.scale(20),
-                                              ),
-                                            ),
-                                            title: Text(
-                                              major.name,
-                                              style: TextStyle(
-                                                color: primaryTextColor,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: scaleConfig.scaleText(
-                                                  16,
-                                                ),
-                                              ),
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
-                                            ),
-                                            trailing: Icon(
-                                              Icons.arrow_forward_ios,
-                                              color: AppColors.accent,
-                                              size: scaleConfig.scaleText(16),
-                                            ),
-                                            onTap: () {
-                                              if (major.id == null) {
-                                                showFeedbackSnackbar(
-                                                  context,
-                                                  'select_major_error_invalid_id'
-                                                      .tr,
-                                                  isError: true,
-                                                );
-                                                return;
-                                              }
-                                              ref
-                                                  .read(
-                                                    selectedMajorIdProvider
-                                                        .notifier,
-                                                  )
-                                                  .state = major.id;
-
-                                              if (wPage == 0) {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder:
-                                                        (context) =>
-                                                            SearchSubjectsPage(
-                                                              majorId:
-                                                                  major.id!,
-                                                            ),
-                                                  ),
-                                                );
-                                              } else if (wPage == 1) {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder:
-                                                        (context) =>
-                                                            ProfessorsPage(
-                                                              majorId:
-                                                                  major.id!,
-                                                            ),
-                                                  ),
-                                                );
-                                              } else if (wPage == 2) {
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder:
-                                                        (context) =>
-                                                            const ManageSubjectsPage(),
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                    loading:
-                        () => const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.primary,
+              return RefreshIndicator(
+                onRefresh: () async =>
+                    ref.invalidate(majorsProvider(universityId!)),
+                color: AppColors.primary,
+                child: ListView.builder(
+                  padding: EdgeInsets.all(scaleConfig.scale(16)),
+                  itemCount: majors.length,
+                  itemBuilder: (context, index) {
+                    final major = majors[index];
+                    return GlassCard(
+                      margin: EdgeInsets.only(bottom: scaleConfig.scale(12)),
+                      borderRadius: BorderRadius.circular(12.0),
+                      child: InkWell(
+                        onTap: () => _onMajorTapped(context, ref, major),
+                        borderRadius: BorderRadius.circular(12.0),
+                        child: ListTile(
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: scaleConfig.scale(16),
+                            vertical: scaleConfig.scale(8),
                           ),
-                        ),
-                    error:
-                        (e, _) => Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(scaleConfig.scale(16)),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.error,
-                                  color: AppColors.error,
-                                  size: scaleConfig.scale(40),
-                                ),
-                                SizedBox(height: scaleConfig.scale(16)),
-                                Text(
-                                  'error_wifi'.tr,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: secondaryTextColor,
-                                    fontSize: scaleConfig.scaleText(16),
-                                  ),
-                                ),
-                              ],
+                          leading: Container(
+                            width: scaleConfig.scale(44),
+                            height: scaleConfig.scale(44),
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: AppColors.primaryGradient,
+                            ),
+                            child: const Icon(
+                              Icons.school_outlined,
+                              color: Colors.white,
+                              size: 22,
                             ),
                           ),
-                        ),
-                  ),
-                ],
-              );
-            },
-            loading:
-                () => const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                ),
-            error:
-                (e, _) => Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(scaleConfig.scale(16)),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.error,
-                          color: AppColors.error,
-                          size: scaleConfig.scale(40),
-                        ),
-                        SizedBox(height: scaleConfig.scale(16)),
-                        Text(
-                          'error_wifi'.tr,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: secondaryTextColor,
-                            fontSize: scaleConfig.scaleText(16),
+                          title: Text(
+                            major.name,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: scaleConfig.scaleText(17),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                          trailing: GradientIcon(
+                            icon: Icons.arrow_forward_ios_rounded,
+                            size: scaleConfig.scaleText(16),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
+              );
+            },
+            loading: () =>
+                const SizedBox.shrink(), // Keep UI static while loading
+            error: (e, _) => _buildErrorState(
+              context,
+              scaleConfig,
+              'error_wifi'.tr,
+              icon: Icons.wifi_off_rounded,
+            ),
           );
         },
+        loading: () => const SizedBox.shrink(), // Keep UI static while loading
+        error: (e, _) => _buildErrorState(
+          context,
+          scaleConfig,
+          'error_wifi'.tr,
+          icon: Icons.error_outline_rounded,
+        ),
+      ),
+    );
+
+    if (isDarkMode) {
+      return GradientScaffold(
+        appBar: appBar,
+        body: bodyContent,
+      );
+    } else {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: appBar,
+        body: bodyContent,
+      );
+    }
+  }
+
+  void _onMajorTapped(BuildContext context, WidgetRef ref, dynamic major) {
+    if (major.id == null) {
+      showFeedbackSnackbar(
+        context,
+        'select_major_error_invalid_id'.tr,
+        isError: true,
+      );
+      return;
+    }
+
+    ref.read(selectedMajorIdProvider.notifier).state = major.id;
+
+    Widget? destinationPage;
+    switch (wPage) {
+      case 0:
+        destinationPage = SearchSubjectsPage(majorId: major.id!);
+        break;
+      case 1:
+        destinationPage = ProfessorsPage(majorId: major.id!);
+        break;
+      case 2:
+        destinationPage = const ManageSubjectsPage();
+        break;
+    }
+
+    if (destinationPage != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => destinationPage!),
+      );
+    }
+  }
+
+  Widget _buildErrorState(
+      BuildContext context, ScaleConfig scaleConfig, String message,
+      {IconData? icon}) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(scaleConfig.scale(24)),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                color: theme.textTheme.bodyMedium?.color,
+                size: scaleConfig.scale(50),
+              ),
+              SizedBox(height: scaleConfig.scale(16)),
+            ],
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: theme.textTheme.bodyMedium?.color,
+                fontSize: scaleConfig.scaleText(16),
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

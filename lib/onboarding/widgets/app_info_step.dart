@@ -1,5 +1,9 @@
+// lib/onboarding/widgets/app_info_step.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/gradient_icon.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 import 'package:unicurve/onboarding/widgets/feature_card.dart';
 
@@ -49,11 +53,13 @@ class _AppInfoStepState extends State<AppInfoStep>
   @override
   Widget build(BuildContext context) {
     final scaleConfig = context.scaleConfig;
-    final textTheme = Theme.of(context).textTheme;
-    const primaryColor = Color(0xFF24C28F);
+    final theme = Theme.of(context);
 
     return SingleChildScrollView(
-      padding: EdgeInsets.only(top: scaleConfig.heightPercentage(0.08)),
+      padding: EdgeInsets.only(
+        top: scaleConfig.heightPercentage(0.08),
+        bottom: scaleConfig.scale(120), // Add padding for the button
+      ),
       child: Column(
         children: [
           _AnimatedUIElement(
@@ -62,16 +68,21 @@ class _AppInfoStepState extends State<AppInfoStep>
               padding: EdgeInsets.all(scaleConfig.scale(20)),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF1A1A1A),
+                color: theme.cardColor.withOpacity(0.8),
                 border: Border.all(
-                  // ignore: deprecated_member_use
-                  color: primaryColor.withOpacity(0.5),
+                  color: AppColors.primary.withOpacity(0.3),
                   width: 2,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  )
+                ],
               ),
-              child: Icon(
-                Icons.school_outlined,
-                color: primaryColor,
+              child: GradientIcon(
+                icon: Icons.school_outlined,
                 size: scaleConfig.scale(40),
               ),
             ),
@@ -87,8 +98,7 @@ class _AppInfoStepState extends State<AppInfoStep>
                   child: Text(
                     'onboarding_welcome_title'.tr,
                     textAlign: TextAlign.center,
-                    style: textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
+                    style: theme.textTheme.displaySmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       fontSize: scaleConfig.scaleText(34),
                     ),
@@ -100,8 +110,7 @@ class _AppInfoStepState extends State<AppInfoStep>
                   child: Text(
                     'onboarding_welcome_subtitle'.tr,
                     textAlign: TextAlign.center,
-                    style: textTheme.titleMedium?.copyWith(
-                      color: Colors.grey[400],
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: scaleConfig.scaleText(16),
                       height: 1.5,
                     ),
@@ -146,7 +155,6 @@ class _AppInfoStepState extends State<AppInfoStep>
               subtitle: 'onboarding_feature4_subtitle'.tr,
             ),
           ),
-          SizedBox(height: scaleConfig.scale(120)),
         ],
       ),
     );

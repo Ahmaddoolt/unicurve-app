@@ -1,3 +1,5 @@
+// lib/pages/uni_admin/providers/professors_provider.dart
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,17 +8,18 @@ import 'package:unicurve/pages/uni_admin/professors/professors_supabase_service.
 
 final professorsProvider = StateNotifierProvider.autoDispose
     .family<ProfessorsNotifier, AsyncValue<List<Professor>>, int>((
-      ref,
-      majorId,
-    ) {
-      final notifier = ProfessorsNotifier(majorId);
-      ref.keepAlive();
-      return notifier;
-    });
+  ref,
+  majorId,
+) {
+  final notifier = ProfessorsNotifier(majorId);
+  ref.keepAlive();
+  return notifier;
+});
 
 class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
   final int majorId;
-  final SupabaseService _supabaseService = SupabaseService();
+  // --- FIX: Made the service public by removing the underscore ---
+  final SupabaseService supabaseService = SupabaseService();
   final TextEditingController searchController = TextEditingController();
 
   List<Professor> _fullProfessorList = [];
@@ -29,7 +32,7 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
   Future<void> fetchProfessors() async {
     state = const AsyncValue.loading();
     try {
-      final professors = await _supabaseService.fetchProfessors(majorId);
+      final professors = await supabaseService.fetchProfessors(majorId);
       _fullProfessorList = professors;
       _filterProfessors();
     } catch (e, stack) {
@@ -42,10 +45,9 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
     if (query.isEmpty) {
       state = AsyncValue.data(_fullProfessorList);
     } else {
-      final filteredList =
-          _fullProfessorList
-              .where((p) => (p.name?.toLowerCase() ?? '').contains(query))
-              .toList();
+      final filteredList = _fullProfessorList
+          .where((p) => (p.name?.toLowerCase() ?? '').contains(query))
+          .toList();
       state = AsyncValue.data(filteredList);
     }
   }
@@ -58,23 +60,22 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
     state = const AsyncValue.loading();
     try {
       final newProfessor = Professor(name: name, majorId: majorId);
-      final insertedProfessor = await _supabaseService.insertProfessor(
+      final insertedProfessor = await supabaseService.insertProfessor(
         newProfessor,
       );
 
-      final subjectInserts =
-          subjectSelection.entries
-              .where((entry) => entry.value)
-              .map(
-                (entry) => {
-                  'professor_id': insertedProfessor.id,
-                  'subject_id': entry.key,
-                  'isActive': subjectActiveStatus[entry.key] ?? false,
-                },
-              )
-              .toList();
+      final subjectInserts = subjectSelection.entries
+          .where((entry) => entry.value)
+          .map(
+            (entry) => {
+              'professor_id': insertedProfessor.id,
+              'subject_id': entry.key,
+              'isActive': subjectActiveStatus[entry.key] ?? false,
+            },
+          )
+          .toList();
       if (subjectInserts.isNotEmpty) {
-        await _supabaseService.insertSubjectProfessors(subjectInserts);
+        await supabaseService.insertSubjectProfessors(subjectInserts);
       }
       await fetchProfessors();
     } catch (e) {
@@ -96,22 +97,21 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
         name: name,
         majorId: majorId,
       );
-      await _supabaseService.updateProfessor(updatedProfessor);
-      await _supabaseService.deleteSubjectProfessors(professor.id);
+      await supabaseService.updateProfessor(updatedProfessor);
+      await supabaseService.deleteSubjectProfessors(professor.id);
 
-      final subjectInserts =
-          subjectSelection.entries
-              .where((entry) => entry.value)
-              .map(
-                (entry) => {
-                  'professor_id': professor.id,
-                  'subject_id': entry.key,
-                  'isActive': subjectActiveStatus[entry.key] ?? false,
-                },
-              )
-              .toList();
+      final subjectInserts = subjectSelection.entries
+          .where((entry) => entry.value)
+          .map(
+            (entry) => {
+              'professor_id': professor.id,
+              'subject_id': entry.key,
+              'isActive': subjectActiveStatus[entry.key] ?? false,
+            },
+          )
+          .toList();
       if (subjectInserts.isNotEmpty) {
-        await _supabaseService.insertSubjectProfessors(subjectInserts);
+        await supabaseService.insertSubjectProfessors(subjectInserts);
       }
       await fetchProfessors();
     } catch (e) {
@@ -129,8 +129,8 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
     _filterProfessors();
 
     try {
-      await _supabaseService.deleteSubjectProfessors(professorId);
-      await _supabaseService.deleteProfessor(professorId);
+      await supabaseService.deleteSubjectProfessors(professorId);
+      await supabaseService.deleteProfessor(professorId);
     } catch (e) {
       _fullProfessorList = previousList;
       _filterProfessors();
@@ -142,10 +142,10 @@ class ProfessorsNotifier extends StateNotifier<AsyncValue<List<Professor>>> {
     Professor professor,
   ) async {
     try {
-      final canTeachSubjects = await _supabaseService.fetchSubjectsForProfessor(
+      final canTeachSubjects = await supabaseService.fetchSubjectsForProfessor(
         professor.id,
       );
-      final teachingSubjects = await _supabaseService.fetchTeachingSubjects(
+      final teachingSubjects = await supabaseService.fetchTeachingSubjects(
         professor.id,
       );
       return {

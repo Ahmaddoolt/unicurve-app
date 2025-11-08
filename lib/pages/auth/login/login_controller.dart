@@ -1,3 +1,5 @@
+// lib/pages/auth/login/login_controller.dart
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -15,34 +17,19 @@ class LoginController extends GetxController {
 
   var rememberMe = false.obs;
   var isLoading = false.obs;
-  var isCheckingCredentials = true.obs;
   var isPasswordObscured = true.obs;
 
-  @override
-  void onInit() {
-    super.onInit();
-    _loadSavedCredentials();
-  }
+  // --- FIX: Removed onInit and _loadSavedCredentials ---
+  // This logic is now handled by the InitializationScreen.
 
   void togglePasswordVisibility() {
     isPasswordObscured.value = !isPasswordObscured.value;
   }
 
-  Future<void> _loadSavedCredentials() async {
-    isCheckingCredentials.value = true;
-    final credentials = await _authService.getSavedCredentials();
-    if (credentials != null && credentials['isRememberMe'] == true) {
-      final currentUser = _authService.getCurrentUser();
-      if (currentUser != null && currentUser.id == credentials['uid']) {
-        rememberMe.value = true;
-        await _navigateBasedOnUserRole(currentUser.id);
-      }
-    }
-    isCheckingCredentials.value = false;
-  }
-
   Future<void> _navigateBasedOnUserRole(String userId) async {
+    // This logic is duplicated in InitializationScreen but is needed here for manual logins.
     if (userId == '48157f0b-a061-45d4-a83e-d725dffa0e99') {
+      // Super Admin ID
       Get.offAll(() => const SuperAdminBottomBar());
       return;
     }

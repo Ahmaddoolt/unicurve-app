@@ -3,6 +3,10 @@ import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:animated_tree_view/animated_tree_view.dart';
 import 'package:unicurve/core/utils/colors.dart';
+import 'package:unicurve/core/utils/custom_appbar.dart';
+import 'package:unicurve/core/utils/glass_card.dart';
+import 'package:unicurve/core/utils/glass_loading_overlay.dart';
+import 'package:unicurve/core/utils/gradient_scaffold.dart';
 import 'package:unicurve/core/utils/scale_config.dart';
 
 class SubjectNodeData {
@@ -55,12 +59,11 @@ class _StudentCurriculumTreePageState extends State<StudentCurriculumTreePage> {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('error_user_not_logged_in'.tr);
 
-      final studentResponse =
-          await supabase
-              .from('students')
-              .select('major_id')
-              .eq('user_id', userId)
-              .single();
+      final studentResponse = await supabase
+          .from('students')
+          .select('major_id')
+          .eq('user_id', userId)
+          .single();
       final majorId = studentResponse['major_id'];
       if (majorId == null) throw Exception('error_student_major_not_found'.tr);
 
@@ -134,65 +137,59 @@ class _StudentCurriculumTreePageState extends State<StudentCurriculumTreePage> {
           _subjectMarkMap = markMap;
           _passedSubjectIds = passedSet;
           _rootNode = root;
-          _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _errorMessage = 'error_build_curriculum_tree'.trParams({
-            'error': e.toString(),
-          });
-          _isLoading = false;
-        });
+        _errorMessage =
+            'error_build_curriculum_tree'.trParams({'error': e.toString()});
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final scaleConfig = context.scaleConfig;
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? lighterColor = Theme.of(context).cardColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: lighterColor,
-      appBar: AppBar(
-        title: Text('my_curriculum_plan_title'.tr),
-        centerTitle: true,
-        backgroundColor: darkerColor,
-        titleTextStyle: TextStyle(
-          color: primaryTextColor,
-          fontWeight: FontWeight.bold,
-          fontSize: scaleConfig.scaleText(18),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _isColorByMarkView ? Icons.style : Icons.style_outlined,
-              color: _isColorByMarkView ? AppColors.accent : AppColors.primary,
-            ),
-            tooltip: 'toggle_progress_view_tooltip'.tr,
-            onPressed:
-                () => setState(() => _isColorByMarkView = !_isColorByMarkView),
+    final appBar = CustomAppBar(
+      useGradient: !isDarkMode,
+      title: 'my_curriculum_plan_title'.tr,
+      actions: [
+        IconButton(
+          icon: Icon(
+            _isColorByMarkView ? Icons.style : Icons.style_outlined,
           ),
-        ],
-      ),
-      body: _buildBody(context),
+          tooltip: 'toggle_progress_view_tooltip'.tr,
+          onPressed: () =>
+              setState(() => _isColorByMarkView = !_isColorByMarkView),
+        ),
+      ],
     );
+
+    final bodyContent = GlassLoadingOverlay(
+      isLoading: _isLoading,
+      child: _buildBody(context),
+    );
+
+    if (isDarkMode) {
+      return GradientScaffold(appBar: appBar, body: bodyContent);
+    } else {
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        appBar: appBar,
+        body: bodyContent,
+      );
+    }
   }
 
   Widget _buildBody(BuildContext context) {
-    Color? darkerColor = Theme.of(context).scaffoldBackgroundColor;
-    Color? primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    Color? secondaryTextColor = Theme.of(context).textTheme.bodyMedium?.color;
+    final theme = Theme.of(context);
 
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      );
-    }
     if (_errorMessage != null) {
       return Center(
         child: Padding(
@@ -206,99 +203,79 @@ class _StudentCurriculumTreePageState extends State<StudentCurriculumTreePage> {
       );
     }
     if (_rootNode == null || _rootNode!.children.isEmpty) {
-      return Center(
-        child: Text(
-          'no_curriculum_plan_available'.tr,
-          style: TextStyle(color: secondaryTextColor),
-        ),
-      );
+      return _isLoading
+          ? const SizedBox.shrink()
+          : Center(
+              child: Text(
+                'no_curriculum_plan_available'.tr,
+                style: theme.textTheme.bodyMedium,
+              ),
+            );
     }
 
     return TreeView.simple(
       tree: _rootNode!,
       showRootNode: false,
-      expansionIndicatorBuilder:
-          (context, node) => ChevronIndicator.rightDown(
-            tree: node,
-            color: secondaryTextColor,
-            padding: const EdgeInsets.all(8),
-          ),
+      expansionIndicatorBuilder: (context, node) => ChevronIndicator.rightDown(
+        tree: node,
+        color: theme.textTheme.bodyMedium?.color,
+        padding: const EdgeInsets.all(8),
+      ),
+      indentation: const Indentation(width: 20),
       builder: (BuildContext context, TreeNode<SubjectNodeData> node) {
         final subject = node.data!;
         final scaleConfig = context.scaleConfig;
 
-        Color cardColor;
-        // ignore: deprecated_member_use
-        Color borderColor = AppColors.primaryDark.withOpacity(0.3);
-
+        Color? statusColor;
         final status = _subjectStatusMap[subject.id];
         final mark = _subjectMarkMap[subject.id];
 
         if (_isColorByMarkView) {
           if (status == 'passed') {
-            // ignore: deprecated_member_use
-            cardColor = AppColors.primary.withOpacity(0.2);
-            borderColor = AppColors.primary;
+            statusColor = AppColors.primary; // Passed
           } else {
-            final prerequisites =
-                _relationships
-                    .where((r) => r['target_subject_id'] == subject.id)
-                    .map<int>((r) => r['source_subject_id'] as int)
-                    .toSet();
-            final bool prerequisitesMet = _passedSubjectIds.containsAll(
-              prerequisites,
-            );
+            final prerequisites = _relationships
+                .where((r) => r['target_subject_id'] == subject.id)
+                .map<int>((r) => r['source_subject_id'] as int)
+                .toSet();
+            final bool prerequisitesMet =
+                _passedSubjectIds.containsAll(prerequisites);
 
-            if (status != 'passed' && prerequisitesMet) {
-              // ignore: deprecated_member_use
-              cardColor = AppColors.accent.withOpacity(0.25);
-              borderColor = AppColors.accent;
+            if (prerequisitesMet) {
+              statusColor = AppColors.accent; // Available to take
             } else {
-              // ignore: deprecated_member_use
-              cardColor = AppColors.error.withOpacity(0.2);
-              borderColor = AppColors.error;
+              statusColor = AppColors.error; // Locked
             }
           }
-        } else {
-          cardColor = darkerColor;
         }
 
-        return Card(
-          color: cardColor,
+        // --- THE KEY FIX IS HERE ---
+        return GlassCard(
           margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-          shape: RoundedRectangleBorder(
-            side: BorderSide(color: borderColor, width: 1.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
+          borderColor: statusColor, // Pass the calculated color to the border
           child: ListTile(
             title: Text(
               subject.name,
-              style: TextStyle(
-                color: primaryTextColor,
-                fontWeight: FontWeight.w600,
-              ),
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
-              'subject_code_level'.trParams({
-                'code': subject.code,
-                'level': subject.level.toString(),
-              }),
-              style: TextStyle(color: secondaryTextColor),
+              'subject_code_level'.trParams(
+                  {'code': subject.code, 'level': subject.level.toString()}),
+              style: theme.textTheme.bodyMedium,
             ),
-            trailing:
-                _isColorByMarkView && mark != null
-                    ? Text(
-                      '$mark%',
-                      style: TextStyle(
-                        color:
-                            status == 'passed'
-                                ? AppColors.primary
-                                : AppColors.error,
-                        fontWeight: FontWeight.bold,
-                        fontSize: scaleConfig.scaleText(16),
-                      ),
-                    )
-                    : null,
+            trailing: _isColorByMarkView && mark != null
+                ? Text(
+                    '$mark%',
+                    style: TextStyle(
+                      color: status == 'passed'
+                          ? AppColors.primary
+                          : AppColors.error,
+                      fontWeight: FontWeight.bold,
+                      fontSize: scaleConfig.scaleText(16),
+                    ),
+                  )
+                : null,
           ),
         );
       },
